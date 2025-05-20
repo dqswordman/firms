@@ -4,7 +4,7 @@ interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
 }
 
-interface SearchParams {
+export interface SearchParams {
   mode: 'country' | 'bbox';
   country?: string;
   west?: number;
@@ -42,7 +42,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
       params.country = country.toUpperCase();
     } else {
       if (!west || !south || !east || !north) {
-        alert('请输入完整的坐标范围');
+        alert('请输入完整的地理边界坐标');
         return;
       }
       params.west = parseFloat(west);
@@ -51,27 +51,23 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
       params.north = parseFloat(north);
     }
 
-    if (!startDate || !endDate) {
-      alert('请选择日期范围');
-      return;
-    }
-
     onSearch(params);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="search-form">
-      <div className="form-group">
-        <label>查询模式：</label>
-        <div className="radio-group">
+    <form onSubmit={handleSubmit} className="p-4 bg-white rounded shadow">
+      <div className="mb-4">
+        <label className="block mb-2">查询模式：</label>
+        <div className="flex gap-4">
           <label>
             <input
               type="radio"
               value="country"
               checked={mode === 'country'}
               onChange={(e) => setMode(e.target.value as 'country')}
+              className="mr-2"
             />
-            按国家查询
+            国家代码
           </label>
           <label>
             <input
@@ -79,100 +75,87 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
               value="bbox"
               checked={mode === 'bbox'}
               onChange={(e) => setMode(e.target.value as 'bbox')}
+              className="mr-2"
             />
-            按坐标查询
+            地理边界
           </label>
         </div>
       </div>
 
       {mode === 'country' ? (
-        <div className="form-group">
-          <label>国家代码：</label>
+        <div className="mb-4">
+          <label className="block mb-2">国家代码（3位大写字母）：</label>
           <input
             type="text"
             value={country}
             onChange={(e) => setCountry(e.target.value)}
-            placeholder="输入 ISO3 国家代码 (例如: USA)"
+            className="w-full p-2 border rounded"
+            placeholder="例如：USA"
             maxLength={3}
           />
         </div>
       ) : (
-        <div className="form-group coordinates">
-          <div className="coordinate-row">
-            <div>
-              <label>西经：</label>
-              <input
-                type="number"
-                value={west}
-                onChange={(e) => setWest(e.target.value)}
-                placeholder="West"
-                min="-180"
-                max="180"
-                step="0.000001"
-              />
-            </div>
-            <div>
-              <label>东经：</label>
-              <input
-                type="number"
-                value={east}
-                onChange={(e) => setEast(e.target.value)}
-                placeholder="East"
-                min="-180"
-                max="180"
-                step="0.000001"
-              />
-            </div>
-          </div>
-          <div className="coordinate-row">
-            <div>
-              <label>南纬：</label>
-              <input
-                type="number"
-                value={south}
-                onChange={(e) => setSouth(e.target.value)}
-                placeholder="South"
-                min="-90"
-                max="90"
-                step="0.000001"
-              />
-            </div>
-            <div>
-              <label>北纬：</label>
-              <input
-                type="number"
-                value={north}
-                onChange={(e) => setNorth(e.target.value)}
-                placeholder="North"
-                min="-90"
-                max="90"
-                step="0.000001"
-              />
-            </div>
+        <div className="mb-4">
+          <label className="block mb-2">地理边界坐标：</label>
+          <div className="grid grid-cols-2 gap-4">
+            <input
+              type="number"
+              value={west}
+              onChange={(e) => setWest(e.target.value)}
+              className="p-2 border rounded"
+              placeholder="西经"
+              step="any"
+            />
+            <input
+              type="number"
+              value={south}
+              onChange={(e) => setSouth(e.target.value)}
+              className="p-2 border rounded"
+              placeholder="南纬"
+              step="any"
+            />
+            <input
+              type="number"
+              value={east}
+              onChange={(e) => setEast(e.target.value)}
+              className="p-2 border rounded"
+              placeholder="东经"
+              step="any"
+            />
+            <input
+              type="number"
+              value={north}
+              onChange={(e) => setNorth(e.target.value)}
+              className="p-2 border rounded"
+              placeholder="北纬"
+              step="any"
+            />
           </div>
         </div>
       )}
 
-      <div className="form-group date-range">
-        <div>
-          <label>开始日期：</label>
+      <div className="mb-4">
+        <label className="block mb-2">日期范围：</label>
+        <div className="grid grid-cols-2 gap-4">
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
+            className="p-2 border rounded"
           />
-        </div>
-        <div>
-          <label>结束日期：</label>
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
+            className="p-2 border rounded"
           />
         </div>
       </div>
 
-      <button type="submit" className="search-button">
+      <button
+        type="submit"
+        className="w-full p-2 text-white bg-blue-500 rounded hover:bg-blue-600"
+      >
         查询
       </button>
     </form>
