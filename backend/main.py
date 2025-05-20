@@ -1,13 +1,17 @@
-import os, re, csv, io, requests
+import os
+import re
+import csv
+import io
+import requests
 from datetime import datetime
 from typing import Optional, List, Dict
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 # Configure CORS
+load_dotenv()
 app = FastAPI(title="Wildfire Visualization API")
 app.add_middleware(
     CORSMiddleware,
@@ -18,7 +22,7 @@ app.add_middleware(
 )
 
 # NASA FIRMS API configuration
-MAP_KEY = "5d12184bae5da99a286386dd6e04de14"
+MAP_KEY = os.getenv("FIRMS_API_KEY", "5d12184bae5da99a286386dd6e04de14")
 ISO3_RE = re.compile(r"^[A-Z]{3}$")
 
 # ---------- 工具函数 ----------
