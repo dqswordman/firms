@@ -20,6 +20,10 @@ This repository contains a wildfire visualization system built with React (front
    ```bash
    cd frontend
    npm install
+   # Tailwind CSS v4 requires the PostCSS plugin
+   # `@tailwindcss/postcss` to be installed.
+   # Ensure postcss.config.js uses:
+   #   plugins: [require('@tailwindcss/postcss'), require('autoprefixer')]
    npm start
    ```
 
