@@ -1,46 +1,45 @@
-# Getting Started with Create React App
+# Wildfire Visualization Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## 技术栈
 
-## Available Scripts
+- React 18
+- TypeScript 4
+- Tailwind CSS 3
+- Leaflet 1.9
+- React-Leaflet 4
+- PostCSS 8
+- Autoprefixer 10
 
-In the project directory, you can run:
+## 快速开始
 
-### `npm start`
+1. 安装依赖（如遇依赖冲突请加 `--legacy-peer-deps`）：
+   ```sh
+   npm install --legacy-peer-deps
+   ```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+2. 启动开发服务器：
+   ```sh
+   npm start
+   ```
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+3. 访问 [http://localhost:3000](http://localhost:3000)
 
-### `npm test`
+## 依赖版本
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- react: 18.2.0
+- react-dom: 18.2.0
+- react-scripts: 5.0.1
+- tailwindcss: ^3.3.0
+- postcss: ^8.4.31
+- autoprefixer: ^10.4.14
+- leaflet: ^1.9.4
+- react-leaflet: ^4.2.1
+- typescript: ^4.9.5
 
-### `npm run build`
+## 其他说明
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+- 如遇 `ajv` 相关错误，请执行：
+  ```sh
+  npm install ajv@^6.12.6 ajv-keywords@^3.5.2 --legacy-peer-deps
+  ```
+- Tailwind/PostCSS 配置见 `postcss.config.js` 和 `tailwind.config.js`。

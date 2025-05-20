@@ -1,6 +1,6 @@
 import React from 'react';
 import { CircleMarker, Popup } from 'react-leaflet';
-import { FirePoint } from '../types';
+import { FirePoint } from 'types';
 
 interface FireHeatmapProps {
   firePoints: FirePoint[];

@@ -1,36 +1,36 @@
-# AGENT Instructions
+# AGENTS.md
 
-This repository contains a wildfire visualization system built with React (frontend) and FastAPI (backend).
+本项目为前端可视化应用，基于以下技术栈：
 
-## Structure
-- **backend/** – FastAPI application (`main.py`) and helper scripts.
-- **frontend/** – React app created with Create React App and Tailwind CSS.
+- React 18
+- TypeScript 4
+- Tailwind CSS 3
+- Leaflet 1.9
+- React-Leaflet 4
+- PostCSS 8
+- Autoprefixer 10
 
-## Development Setup
-1. Install Python packages:
-   ```bash
-   pip install -r backend/requirements.txt
-   ```
-   Ensure environment variable `FIRMS_API_KEY` is defined (can be stored in a `.env` file).
-2. Start the API server:
-   ```bash
-   uvicorn backend.main:app --reload
-   ```
-3. Install Node packages and run the frontend:
-   ```bash
-   cd frontend
-   npm install
-   # Tailwind CSS v4 requires the PostCSS plugin
-   # `@tailwindcss/postcss` to be installed.
-   # Ensure postcss.config.js uses:
-   #   plugins: [require('@tailwindcss/postcss'), require('autoprefixer')]
-   npm start
-   ```
+**运行环境：**
+- Node.js 16 或 18
+- npm 7 或 8
 
-## Testing
-- Run React tests (if any) with `npm test` inside `frontend`.
-- Basic API test script is `python backend/test_api.py`. Dependencies like `requests` are required.
+**主要依赖版本：**
+- react: 18.2.0
+- react-dom: 18.2.0
+- react-scripts: 5.0.1
+- tailwindcss: ^3.3.0
+- postcss: ^8.4.31
+- autoprefixer: ^10.4.14
+- leaflet: ^1.9.4
+- react-leaflet: ^4.2.1
+- typescript: ^4.9.5
 
-## Notes
-- Python bytecode, virtual environments, and node modules are ignored via `.gitignore`.
-- The backend reads the NASA FIRMS API key from the `FIRMS_API_KEY` environment variable.
+**启动方式：**
+```sh
+npm install --legacy-peer-deps
+npm start
+```
+
+**注意事项：**
+- 本项目不依赖 OpenAI Codex，也不需要 AGENTS 相关配置。
+- 如遇依赖冲突，优先使用 `--legacy-peer-deps` 安装。
