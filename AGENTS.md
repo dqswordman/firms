@@ -4,7 +4,9 @@
 
 ### Frontend (React + TypeScript)
 - Built with React 18 and TypeScript
-- Map visualization using Leaflet
+- Map visualization using Leaflet and react-leaflet
+- Clustering with Leaflet.markercluster
+- Data visualization with Chart.js and react-chartjs-2
 - Responsive design with Tailwind CSS
 - Date handling with date-fns
 
@@ -12,6 +14,25 @@
 - RESTful API built with FastAPI
 - NASA FIRMS API integration using requests library
 - Environment variable management with python-dotenv
+
+## Component Structure
+
+### Frontend Components
+1. Map Components:
+   - `FireMap`: Main map container and visualization controls
+   - `FireHeatmap`: Heatmap layer (always visible)
+   - `FireCluster`: Clustering layer (always visible)
+   - `SearchForm`: Country/region search interface
+   - `TimeSlider`: Date selection and navigation
+
+2. Visualization Components:
+   - `FireStatsPanel`: Statistical analysis (toggleable)
+   - `FireTrendChart`: Time series trends (toggleable)
+   - `FireRadarChart`: FRP and day/night distribution (toggleable)
+
+3. Utility Components:
+   - `SearchForm`: Query interface
+   - `TimeSlider`: Date navigation
 
 ## Development Environment Setup
 
@@ -36,6 +57,9 @@ Frontend dependencies include:
 - react-dom
 - react-leaflet
 - leaflet
+- leaflet.markercluster
+- chart.js
+- react-chartjs-2
 - tailwindcss
 - date-fns
 - typescript
@@ -98,6 +122,9 @@ After starting the backend server, access the API documentation at:
    - Ensure backend server is running
    - Development server runs on http://localhost:3000
    - Use `npm run build` to create production build
+   - Visualization layers can be toggled in the control panel
+   - Heatmap and Clusters are always visible
+   - Other visualizations (Stats, Trends, Radar) are toggleable
 
 2. Backend Development:
    - Ensure FIRMS API key is correctly set
@@ -137,11 +164,14 @@ uvicorn main:app --host 0.0.0.0 --port 8000
    - Clear node_modules and reinstall: `rm -rf node_modules && npm install`
    - Clear cache: `npm cache clean --force`
    - Check browser console for errors
+   - Ensure all visualization layers are properly initialized
+   - Verify map container dimensions are correct
 
 2. Backend Issues:
    - Verify FIRMS API key is correct
    - Check log output
    - Ensure all dependencies are properly installed
+   - Monitor API rate limits
 
 ## Contribution Guidelines
 
@@ -156,3 +186,10 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 3. Testing:
    - Frontend: `npm test`
    - Backend: `pytest`
+
+4. Component Development:
+   - Follow existing component structure
+   - Maintain consistent styling with Tailwind CSS
+   - Ensure proper TypeScript typing
+   - Add appropriate error handling
+   - Include necessary documentation

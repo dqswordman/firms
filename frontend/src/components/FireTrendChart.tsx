@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,14 +10,16 @@ import {
   Legend,
   TimeScale,
   ChartOptions,
-  TimeUnit
+  TimeUnit,
+  ChartData,
+  ChartTypeRegistry,
+  LineController
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
 import { format, eachDayOfInterval, startOfDay, endOfDay } from 'date-fns';
 import 'chartjs-adapter-date-fns';
 import { FirePoint } from '../types';
 
-// 注册 Chart.js 组件
+// Register Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -26,7 +28,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  TimeScale,
+  LineController
 );
 
 interface DailyStats {
@@ -41,18 +44,21 @@ interface FireTrendChartProps {
   endDate: Date;
 }
 
-const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, endDate }) => {
-  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
+type ChartDataType = ChartData<'line', { x: Date; y: number }[], unknown>;
 
-  // 计算每日统计数据
-  useEffect(() => {
-    // 生成日期范围内的所有日期
+const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, endDate }) => {
+  const chartRef = useRef<HTMLCanvasElement>(null);
+  const chartInstance = useRef<ChartJS<'line', { x: Date; y: number }[], unknown> | null>(null);
+
+  // Calculate daily statistics using useMemo
+  const dailyStats = useMemo(() => {
+    if (firePoints.length === 0) return [];
+
     const allDays = eachDayOfInterval({
       start: startOfDay(startDate),
       end: endOfDay(endDate)
     });
 
-    // 初始化每日统计数据
     const statsMap = new Map(
       allDays.map(date => [
         format(date, 'yyyy-MM-dd'),
@@ -60,7 +66,6 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
       ])
     );
 
-    // 统计每日火点数量和总 FRP
     firePoints.forEach(point => {
       const dateStr = point.acq_date;
       const stats = statsMap.get(dateStr);
@@ -70,16 +75,14 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
       }
     });
 
-    // 转换为数组并排序
-    const stats = Array.from(statsMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
-    setDailyStats(stats);
+    return Array.from(statsMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [firePoints, startDate, endDate]);
 
-  // 图表配置
-  const chartData = {
+  // Prepare chart data
+  const chartData = useMemo<ChartDataType>(() => ({
     datasets: [
       {
-        label: '火点数量',
+        label: 'Fire Point Count',
         data: dailyStats.map(stat => ({
           x: stat.date,
           y: stat.count
@@ -89,10 +92,11 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
         fill: true,
         tension: 0.4,
         pointRadius: 0,
-        pointHoverRadius: 5
+        pointHoverRadius: 5,
+        yAxisID: 'count'
       },
       {
-        label: '平均 FRP (MW)',
+        label: 'Average FRP (MW)',
         data: dailyStats.map(stat => ({
           x: stat.date,
           y: stat.count > 0 ? stat.totalFrp / stat.count : 0
@@ -106,9 +110,10 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
         yAxisID: 'frp'
       }
     ]
-  };
+  }), [dailyStats]);
 
-  const options: ChartOptions<'line'> = {
+  // Chart options
+  const options = useMemo<ChartOptions<'line'>>(() => ({
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -118,7 +123,7 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
     plugins: {
       title: {
         display: true,
-        text: '火点数量与平均辐射功率趋势'
+        text: 'Fire Point Count and Average Radiative Power Trend'
       },
       tooltip: {
         callbacks: {
@@ -144,16 +149,16 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
         },
         title: {
           display: true,
-          text: '日期'
+          text: 'Date'
         }
       },
-      y: {
+      count: {
         type: 'linear',
         display: true,
         position: 'left',
         title: {
           display: true,
-          text: '火点数量'
+          text: 'Fire Point Count'
         }
       },
       frp: {
@@ -162,22 +167,68 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
         position: 'right',
         title: {
           display: true,
-          text: '平均 FRP (MW)'
+          text: 'Average FRP (MW)'
         },
         grid: {
           drawOnChartArea: false
         }
       }
     }
-  };
+  }), []);
+
+  // Initialize and update chart
+  useEffect(() => {
+    let chart: ChartJS<'line', { x: Date; y: number }[], unknown> | null = null;
+
+    const initChart = () => {
+      if (!chartRef.current || dailyStats.length === 0) return;
+
+      const ctx = chartRef.current.getContext('2d');
+      if (!ctx) return;
+
+      // Destroy existing chart if it exists
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+        chartInstance.current = null;
+      }
+
+      // Create new chart
+      chart = new ChartJS<'line', { x: Date; y: number }[], unknown>(ctx, {
+        type: 'line',
+        data: chartData,
+        options: options
+      });
+
+      chartInstance.current = chart;
+    };
+
+    // Initialize chart
+    initChart();
+
+    // Cleanup
+    return () => {
+      if (chart) {
+        chart.destroy();
+        chart = null;
+      }
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+        chartInstance.current = null;
+      }
+    };
+  }, [chartData, options, dailyStats]);
+
+  if (firePoints.length === 0) {
+    return null;
+  }
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-lg">
-      <div className="w-full h-[400px]">
-        <Line data={chartData} options={options} />
+      <div style={{ position: 'relative', width: '100%', height: '400px' }}>
+        <canvas ref={chartRef} />
       </div>
     </div>
   );
 };
 
-export default FireTrendChart; 
+export default React.memo(FireTrendChart); 

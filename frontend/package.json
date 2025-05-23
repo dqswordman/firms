@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@changey/react-leaflet-markercluster": "^4.0.0-rc1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/material": "^7.1.0",
@@ -11,8 +12,10 @@
     "@vgrid/react-leaflet-heatmap-layer": "^4.0.3",
     "ajv": "^6.12.6",
     "ajv-keywords": "^3.5.2",
+    "chartjs-adapter-date-fns": "^3.0.0",
     "date-fns": "^2.30.0",
     "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-leaflet": "^4.2.1"

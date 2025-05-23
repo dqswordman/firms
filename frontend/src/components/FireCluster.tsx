@@ -1,147 +1,153 @@
-import React, { useMemo } from 'react';
-import { Marker, Popup } from 'react-leaflet';
+import React, { useEffect, useRef } from 'react';
+import { useMap } from 'react-leaflet';
 import L from 'leaflet';
-import MarkerClusterGroup from '@changey/react-leaflet-markercluster';
-import { FirePoint } from '../types';
+import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import { FirePoint } from '../types';
+
+// Add type definitions for leaflet.markercluster
+declare module 'leaflet' {
+  interface MarkerClusterGroup extends L.Layer {
+    clearLayers(): this;
+    addLayer(layer: L.Layer): this;
+  }
+
+  interface MarkerCluster extends L.Layer {
+    getChildCount(): number;
+  }
+}
 
 interface FireClusterProps {
   firePoints: FirePoint[];
 }
 
 const FireCluster: React.FC<FireClusterProps> = ({ firePoints }) => {
-  // 根据置信度获取点的颜色
-  const getColorByConfidence = (confidence: string) => {
-    switch (confidence) {
-      case 'high':
-        return '#FF0000'; // 红色 - 高置信度
-      case 'medium':
-        return '#FFA500'; // 橙色 - 中置信度
-      case 'low':
-        return '#FFFF00'; // 黄色 - 低置信度
-      default:
-        return '#808080'; // 灰色 - 未知置信度
+  const map = useMap();
+  const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
+
+  const getColorForConfidence = (confidence: string): string => {
+    const conf = confidence.toLowerCase();
+    if (conf === 'h' || (conf.match(/^\d+$/) && parseInt(conf) >= 80)) {
+      return '#FF0000'; // Red for high confidence
+    } else if (conf === 'n' || (conf.match(/^\d+$/) && parseInt(conf) >= 30)) {
+      return '#FFA500'; // Orange for medium confidence
     }
+    return '#FFFF00'; // Yellow for low confidence
   };
 
-  // 创建自定义图标
-  const createCustomIcon = (point: FirePoint) => {
-    const color = getColorByConfidence(point.confidence);
-    return L.divIcon({
-      className: 'custom-div-icon',
-      html: `
-        <div 
-          style="
-            background-color: ${color};
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            border: 1px solid white;
-            box-shadow: 0 0 2px rgba(0,0,0,0.3);
-          "
-        />
-      `,
-      iconSize: [12, 12],
-      iconAnchor: [6, 6],
-      popupAnchor: [0, -6]
-    });
-  };
+  useEffect(() => {
+    if (!clusterGroupRef.current) {
+      // Create marker cluster group using the global L.MarkerClusterGroup
+      const clusterGroup = new (L as any).MarkerClusterGroup({
+        maxClusterRadius: 50,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
+        disableClusteringAtZoom: 12,
+        chunkedLoading: true,
+        iconCreateFunction: (cluster: L.MarkerCluster) => {
+          const count = cluster.getChildCount();
+          let size = 'small';
+          let color = '#FFA500';
+          let fontSize = '12px';
+          let iconSize = 30;
 
-  // 配置聚类选项
-  const clusterOptions = {
-    maxClusterRadius: 50, // 聚合半径
-    spiderfyOnMaxZoom: true, // 在最大缩放级别时展开
-    showCoverageOnHover: false, // 禁用悬停时显示覆盖区域
-    zoomToBoundsOnClick: true, // 点击时缩放到边界
-    disableClusteringAtZoom: 12, // 在此缩放级别以上禁用聚合
-    chunkedLoading: true, // 启用分块加载以提高性能
-    // 自定义聚类图标样式
-    iconCreateFunction: (cluster: any) => {
-      const count = cluster.getChildCount();
-      let size = 'small';
-      let color = '#FFA500';
-      let fontSize = '12px';
-      let iconSize = 30;
+          if (count > 100) {
+            size = 'large';
+            color = '#FF0000';
+            fontSize = '14px';
+            iconSize = 40;
+          } else if (count > 50) {
+            size = 'medium';
+            color = '#FF4500';
+            fontSize = '13px';
+            iconSize = 35;
+          }
 
-      if (count > 100) {
-        size = 'large';
-        color = '#FF0000';
-        fontSize = '14px';
-        iconSize = 40;
-      } else if (count > 50) {
-        size = 'medium';
-        color = '#FF4500';
-        fontSize = '13px';
-        iconSize = 35;
-      }
-
-      return L.divIcon({
-        html: `
-          <div style="
-            background-color: ${color};
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: ${fontSize};
-            border: 2px solid white;
-            box-shadow: 0 0 4px rgba(0,0,0,0.3);
-          ">
-            ${count}
-          </div>
-        `,
-        className: `marker-cluster marker-cluster-${size}`,
-        iconSize: L.point(iconSize, iconSize)
+          return L.divIcon({
+            html: `<div style="
+              background-color: ${color};
+              width: 100%;
+              height: 100%;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-weight: bold;
+              font-size: ${fontSize};
+              border: 2px solid white;
+              box-shadow: 0 0 4px rgba(0,0,0,0.3);
+            ">${count}</div>`,
+            className: `marker-cluster marker-cluster-${size}`,
+            iconSize: L.point(iconSize, iconSize)
+          });
+        }
       });
-    }
-  };
 
-  // 使用 useMemo 优化标记创建
-  const markers = useMemo(() => {
-    return firePoints.map((point, index) => {
+      // Store the reference and add to map
+      clusterGroupRef.current = clusterGroup;
+      map.addLayer(clusterGroup);
+    }
+
+    const clusterGroup = clusterGroupRef.current;
+    if (!clusterGroup) return;
+
+    // Clear existing markers
+    clusterGroup.clearLayers();
+
+    // Add new markers
+    firePoints.forEach((point) => {
       const lat = parseFloat(point.latitude);
       const lng = parseFloat(point.longitude);
-      
-      if (isNaN(lat) || isNaN(lng)) return null;
+      const confidence = point.confidence;
+      const color = getColorForConfidence(confidence);
 
-      return (
-        <Marker
-          key={`${point.acq_date}-${point.acq_time}-${index}`}
-          position={[lat, lng]}
-          icon={createCustomIcon(point)}
-        >
-          <Popup>
-            <div className="text-sm">
-              <p>Brightness (TI4): {parseFloat(point.bright_ti4).toFixed(2)}</p>
-              <p>Brightness (TI5): {parseFloat(point.bright_ti5).toFixed(2)}</p>
-              <p>Date: {point.acq_date}</p>
-              <p>Time: {point.acq_time}</p>
-              <p>Satellite: {point.satellite}</p>
-              <p>Confidence: {point.confidence}</p>
-              <p>Radiative Power: {parseFloat(point.frp).toFixed(2)} MW</p>
-              <p>Country: {point.country_id}</p>
-              <p>Day/Night: {point.daynight === 'D' ? 'Day' : 'Night'}</p>
-              <p>Instrument: {point.instrument}</p>
-              <p>Scan: {point.scan}</p>
-              <p>Track: {point.track}</p>
-              <p>Version: {point.version}</p>
-            </div>
-          </Popup>
-        </Marker>
-      );
-    }).filter(Boolean);
-  }, [firePoints]);
+      if (isNaN(lat) || isNaN(lng)) {
+        console.error('Invalid coordinates for point:', point);
+        return;
+      }
 
-  return (
-    <MarkerClusterGroup {...clusterOptions}>
-      {markers}
-    </MarkerClusterGroup>
-  );
+      const marker = L.circleMarker([lat, lng], {
+        radius: 5,
+        fillColor: color,
+        fillOpacity: 0.7,
+        color: 'transparent'
+      });
+
+      marker.bindPopup(`
+        <div class="text-sm">
+          <h3 class="font-bold mb-2">Fire Point Details</h3>
+          <p><span class="font-semibold">Confidence:</span> ${confidence}</p>
+          <p><span class="font-semibold">Brightness (TI4):</span> ${parseFloat(point.bright_ti4).toFixed(2)}K</p>
+          <p><span class="font-semibold">Brightness (TI5):</span> ${parseFloat(point.bright_ti5).toFixed(2)}K</p>
+          <p><span class="font-semibold">Date:</span> ${point.acq_date}</p>
+          <p><span class="font-semibold">Time:</span> ${point.acq_time}</p>
+          <p><span class="font-semibold">Satellite:</span> ${point.satellite}</p>
+          <p><span class="font-semibold">Radiative Power:</span> ${parseFloat(point.frp).toFixed(2)} MW</p>
+          <p><span class="font-semibold">Country:</span> ${point.country_id}</p>
+          <p><span class="font-semibold">Day/Night:</span> ${point.daynight === 'D' ? 'Day' : 'Night'}</p>
+          <p><span class="font-semibold">Instrument:</span> ${point.instrument}</p>
+          <p><span class="font-semibold">Scan:</span> ${point.scan}</p>
+          <p><span class="font-semibold">Track:</span> ${point.track}</p>
+          <p><span class="font-semibold">Version:</span> ${point.version}</p>
+        </div>
+      `);
+
+      clusterGroup.addLayer(marker);
+    });
+
+    // Cleanup
+    return () => {
+      if (clusterGroupRef.current) {
+        map.removeLayer(clusterGroupRef.current);
+        clusterGroupRef.current = null;
+      }
+    };
+  }, [map, firePoints]);
+
+  return null;
 };
 
 export default FireCluster; 

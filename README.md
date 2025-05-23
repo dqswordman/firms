@@ -4,12 +4,17 @@ A global wildfire data visualization system based on NASA FIRMS API, supporting 
 
 ## Features
 
-- 🌍 Global wildfire data visualization
+- 🌍 Global wildfire data visualization with interactive map
 - 🔍 Country or region-based query support
-- 📅 Time series data display
+- 📅 Time series data display with date slider
 - 🎯 Detailed wildfire point information
-- 📊 Wildfire intensity heat map
-- 📱 Responsive design
+- 📊 Multiple visualization layers:
+  - Heatmap (always visible)
+  - Clusters (always visible)
+  - Statistics Panel (toggleable)
+  - Trend Chart (toggleable)
+  - Radar Chart (toggleable)
+- 📱 Responsive design with modern UI
 
 ## Quick Start
 
@@ -77,17 +82,26 @@ Now you can access the application at http://localhost:3000 in your browser.
    - Use forward/backward buttons to navigate adjacent dates
    - Time span limited to 10 days
 
-3. Data Display:
-   - Map shows wildfire locations and intensity
+3. Visualization Controls:
+   - Heatmap and Clusters are always visible
+   - Statistics Panel: Toggle to show/hide detailed statistics
+   - Trend Chart: Toggle to show/hide fire point trends
+   - Radar Chart: Toggle to show/hide FRP and day/night distribution
+
+4. Data Display:
+   - Map shows wildfire locations with heatmap and clustering
    - Click on points to view detailed information
    - Support map zoom and pan
+   - Multiple visualization layers for comprehensive analysis
 
 ## Technology Stack
 
 ### Frontend
 - React 18
 - TypeScript
-- Leaflet
+- Leaflet + react-leaflet
+- Leaflet.markercluster
+- Chart.js + react-chartjs-2
 - Tailwind CSS
 - date-fns
 
