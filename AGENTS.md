@@ -1,36 +1,158 @@
-# AGENTS.md
+# FIRMS Wildfire Data Visualization System
 
-本项目为前端可视化应用，基于以下技术栈：
+## System Architecture
 
-- React 18
-- TypeScript 4
-- Tailwind CSS 3
-- Leaflet 1.9
-- React-Leaflet 4
-- PostCSS 8
-- Autoprefixer 10
+### Frontend (React + TypeScript)
+- Built with React 18 and TypeScript
+- Map visualization using Leaflet
+- Responsive design with Tailwind CSS
+- Date handling with date-fns
 
-**运行环境：**
-- Node.js 16 或 18
-- npm 7 或 8
+### Backend (FastAPI + Python)
+- RESTful API built with FastAPI
+- NASA FIRMS API integration using requests library
+- Environment variable management with python-dotenv
 
-**主要依赖版本：**
-- react: 18.2.0
-- react-dom: 18.2.0
-- react-scripts: 5.0.1
-- tailwindcss: ^3.3.0
-- postcss: ^8.4.31
-- autoprefixer: ^10.4.14
-- leaflet: ^1.9.4
-- react-leaflet: ^4.2.1
-- typescript: ^4.9.5
+## Development Environment Setup
 
-**启动方式：**
-```sh
-npm install --legacy-peer-deps
+### Frontend Setup
+1. Navigate to frontend directory:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start development server:
+```bash
 npm start
 ```
 
-**注意事项：**
-- 本项目不依赖 OpenAI Codex，也不需要 AGENTS 相关配置。
-- 如遇依赖冲突，优先使用 `--legacy-peer-deps` 安装。
+Frontend dependencies include:
+- react
+- react-dom
+- react-leaflet
+- leaflet
+- tailwindcss
+- date-fns
+- typescript
+- @types/react
+- @types/react-dom
+- @types/leaflet
+
+### Backend Setup
+1. Navigate to backend directory:
+```bash
+cd backend
+```
+
+2. Create and activate virtual environment (Windows):
+```bash
+python -m venv venv
+.\venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Start development server:
+```bash
+uvicorn main:app --reload
+```
+
+Backend dependencies include:
+- fastapi
+- uvicorn
+- requests
+- python-dotenv
+- python-multipart
+
+## Environment Variables Configuration
+
+### Frontend Environment Variables
+Create `.env` file:
+```
+REACT_APP_API_URL=http://localhost:8000
+```
+
+### Backend Environment Variables
+Create `.env` file:
+```
+FIRMS_API_KEY=your_api_key_here
+```
+
+## API Documentation
+
+After starting the backend server, access the API documentation at:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+## Development Notes
+
+1. Frontend Development:
+   - Ensure backend server is running
+   - Development server runs on http://localhost:3000
+   - Use `npm run build` to create production build
+
+2. Backend Development:
+   - Ensure FIRMS API key is correctly set
+   - Development server runs on http://localhost:8000
+   - Use `uvicorn main:app --host 0.0.0.0 --port 8000` for production server
+
+3. Data Query Limitations:
+   - Time span cannot exceed 10 days
+   - Start date must be earlier than end date
+   - End date cannot exceed today
+
+## Deployment Guide
+
+### Frontend Deployment
+1. Create production build:
+```bash
+cd frontend
+npm run build
+```
+
+2. Deploy files from the `build` directory to your web server
+
+### Backend Deployment
+1. Install production dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+2. Start production server:
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+## Troubleshooting
+
+1. Frontend Issues:
+   - Clear node_modules and reinstall: `rm -rf node_modules && npm install`
+   - Clear cache: `npm cache clean --force`
+   - Check browser console for errors
+
+2. Backend Issues:
+   - Verify FIRMS API key is correct
+   - Check log output
+   - Ensure all dependencies are properly installed
+
+## Contribution Guidelines
+
+1. Code Style:
+   - Frontend: ESLint and Prettier
+   - Backend: PEP 8 standards
+
+2. Commit Standards:
+   - Use clear commit messages
+   - Use separate branches for features or fixes
+
+3. Testing:
+   - Frontend: `npm test`
+   - Backend: `pytest`

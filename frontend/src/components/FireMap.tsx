@@ -16,48 +16,31 @@ const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch }) => {
   const [dates, setDates] = useState<string[]>([]);
   const [currentDate, setCurrentDate] = useState<string>('');
 
-  console.log('FireMap received firePoints:', firePoints);
-
-  // Extract unique dates and sort them
+  // 提取并排序唯一日期
   useEffect(() => {
     if (firePoints.length > 0) {
       const uniqueDates = Array.from(new Set(firePoints.map(point => point.acq_date)))
         .sort();
       setDates(uniqueDates);
-      if (uniqueDates.length > 0) {
-        const initialDate = uniqueDates[0];
-        setCurrentDate(initialDate);
-        // Initially filter by the first date
-        const initialFiltered = firePoints.filter(point => point.acq_date === initialDate);
-        setFilteredPoints(initialFiltered);
-        console.log('FireMap initial filtered points:', initialFiltered);
+      if (uniqueDates.length > 0 && !currentDate) {
+        setCurrentDate(uniqueDates[0]);
       }
     } else {
       setDates([]);
       setCurrentDate('');
-      setFilteredPoints([]);
-      console.log('FireMap received empty firePoints or no dates found.');
     }
   }, [firePoints]);
 
-  // Filter points when currentDate changes
+  // 根据当前日期过滤点
   useEffect(() => {
     if (currentDate && firePoints.length > 0) {
-      const newFiltered = firePoints.filter(point => point.acq_date === currentDate);
-      setFilteredPoints(newFiltered);
-      console.log('FireMap filtered points for date', currentDate, ':', newFiltered);
-    } else if (firePoints.length > 0 && !currentDate && dates.length > 0) {
-       // If currentDate is not set but dates are available (e.g., after initial load)
-      const initialDate = dates[0];
-      setCurrentDate(initialDate);
-       const initialFiltered = firePoints.filter(point => point.acq_date === initialDate);
-      setFilteredPoints(initialFiltered);
-      console.log('FireMap filtered points for initial date (useEffect):', initialFiltered);
+      const filtered = firePoints.filter(point => point.acq_date === currentDate);
+      setFilteredPoints(filtered);
+      console.log('FireMap filtered points for date', currentDate, ':', filtered);
     } else {
       setFilteredPoints([]);
-       console.log('FireMap filtering resulted in empty points or no current date.');
     }
-  }, [currentDate, firePoints, dates]);
+  }, [currentDate, firePoints]);
 
   const handleTimeChange = (date: string) => {
     setCurrentDate(date);
@@ -77,10 +60,8 @@ const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch }) => {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
-        {/* Render FireHeatmap with filtered points */}
         {filteredPoints.length > 0 && <FireHeatmap firePoints={filteredPoints} />}
       </MapContainer>
-      {/* Render TimeSlider with dates and current date */}
       {firePoints.length > 0 && dates.length > 0 && (
         <TimeSlider
           dates={dates}

@@ -36,13 +36,13 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
 
     if (mode === 'country') {
       if (!country) {
-        alert('请输入国家代码');
+        alert('Please enter a country code');
         return;
       }
       params.country = country.toUpperCase();
     } else {
       if (!west || !south || !east || !north) {
-        alert('请输入完整的地理边界坐标');
+        alert('Please enter complete geographic boundary coordinates');
         return;
       }
       params.west = parseFloat(west);
@@ -57,7 +57,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
   return (
     <form onSubmit={handleSubmit} className="p-4 bg-white rounded shadow">
       <div className="mb-4">
-        <label className="block mb-2">查询模式：</label>
+        <label className="block mb-2">Query Mode:</label>
         <div className="flex gap-4">
           <label>
             <input
@@ -67,7 +67,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
               onChange={(e) => setMode(e.target.value as 'country')}
               className="mr-2"
             />
-            国家代码
+            Country Code
           </label>
           <label>
             <input
@@ -77,33 +77,33 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
               onChange={(e) => setMode(e.target.value as 'bbox')}
               className="mr-2"
             />
-            地理边界
+            Geographic Boundary
           </label>
         </div>
       </div>
 
       {mode === 'country' ? (
         <div className="mb-4">
-          <label className="block mb-2">国家代码（3位大写字母）：</label>
+          <label className="block mb-2">Country Code (3 uppercase letters):</label>
           <input
             type="text"
             value={country}
             onChange={(e) => setCountry(e.target.value)}
             className="w-full p-2 border rounded"
-            placeholder="例如：USA"
+            placeholder="e.g., USA"
             maxLength={3}
           />
         </div>
       ) : (
         <div className="mb-4">
-          <label className="block mb-2">地理边界坐标：</label>
+          <label className="block mb-2">Geographic Boundary Coordinates:</label>
           <div className="grid grid-cols-2 gap-4">
             <input
               type="number"
               value={west}
               onChange={(e) => setWest(e.target.value)}
               className="p-2 border rounded"
-              placeholder="西经"
+              placeholder="West Longitude"
               step="any"
             />
             <input
@@ -111,7 +111,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
               value={south}
               onChange={(e) => setSouth(e.target.value)}
               className="p-2 border rounded"
-              placeholder="南纬"
+              placeholder="South Latitude"
               step="any"
             />
             <input
@@ -119,7 +119,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
               value={east}
               onChange={(e) => setEast(e.target.value)}
               className="p-2 border rounded"
-              placeholder="东经"
+              placeholder="East Longitude"
               step="any"
             />
             <input
@@ -127,7 +127,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
               value={north}
               onChange={(e) => setNorth(e.target.value)}
               className="p-2 border rounded"
-              placeholder="北纬"
+              placeholder="North Latitude"
               step="any"
             />
           </div>
@@ -135,7 +135,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
       )}
 
       <div className="mb-4">
-        <label className="block mb-2">日期范围：</label>
+        <label className="block mb-2">Date Range:</label>
         <div className="grid grid-cols-2 gap-4">
           <input
             type="date"
@@ -156,7 +156,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
         type="submit"
         className="w-full p-2 text-white bg-blue-500 rounded hover:bg-blue-600"
       >
-        查询
+        Query
       </button>
     </form>
   );

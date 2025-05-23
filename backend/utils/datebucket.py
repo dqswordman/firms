@@ -11,19 +11,19 @@ def bucket_by_date(
     start: date,
     end: date,
 ) -> OrderedDict[str, List[Dict[str, Any]]]:
-    """将火灾数据按日期分组。
+    """Group wildfire data by date.
     
     Args:
-        rows: 火灾数据列表，每项必须包含 acq_date 字段
-        start: 开始日期（含）
-        end: 结束日期（含）
+        rows: List of wildfire data, each item must contain acq_date field
+        start: Start date (inclusive)
+        end: End date (inclusive)
         
     Returns:
-        按日期分组的 OrderedDict，键为 ISO 格式日期字符串
+        OrderedDict grouped by date, with ISO format date strings as keys
         
     Raises:
-        ValueError: 当日期范围无效或数据格式错误时
-        TypeError: 当输入类型错误时
+        ValueError: When date range is invalid or data format is incorrect
+        TypeError: When input type is incorrect
     """
     if rows is None:
         rows = []
@@ -31,24 +31,24 @@ def bucket_by_date(
     if start > end:
         raise ValueError("start date must not be later than end date")
         
-    # 初始化日期桶
+    # Initialize date buckets
     bucket: OrderedDict[str, List[Dict[str, Any]]] = OrderedDict()
     cur = start
     while cur <= end:
         bucket[cur.isoformat()] = []
         cur += timedelta(days=1)
         
-    # 填充数据
+    # Fill data
     for row in rows:
         if not isinstance(row, dict):
             raise TypeError(f"expected dict, got {type(row)}")
             
         acq_date = row.get("acq_date")
         if not acq_date:
-            continue  # 跳过没有日期的记录
+            continue  # Skip records without date
             
         if not isinstance(acq_date, str) or not ISO_DATE_RE.match(acq_date):
-            continue  # 跳过日期格式不正确的记录
+            continue  # Skip records with incorrect date format
             
         if acq_date in bucket:
             bucket[acq_date].append(row)

@@ -117,19 +117,19 @@ const FireCluster: React.FC<FireClusterProps> = ({ firePoints }) => {
         >
           <Popup>
             <div className="text-sm">
-              <p>亮度 (TI4): {parseFloat(point.bright_ti4).toFixed(2)}</p>
-              <p>亮度 (TI5): {parseFloat(point.bright_ti5).toFixed(2)}</p>
-              <p>日期: {point.acq_date}</p>
-              <p>时间: {point.acq_time}</p>
-              <p>卫星: {point.satellite}</p>
-              <p>置信度: {point.confidence}</p>
-              <p>辐射功率: {parseFloat(point.frp).toFixed(2)} MW</p>
-              <p>国家: {point.country_id}</p>
-              <p>昼夜: {point.daynight === 'D' ? '白天' : '夜间'}</p>
-              <p>仪器: {point.instrument}</p>
-              <p>扫描: {point.scan}</p>
-              <p>轨道: {point.track}</p>
-              <p>版本: {point.version}</p>
+              <p>Brightness (TI4): {parseFloat(point.bright_ti4).toFixed(2)}</p>
+              <p>Brightness (TI5): {parseFloat(point.bright_ti5).toFixed(2)}</p>
+              <p>Date: {point.acq_date}</p>
+              <p>Time: {point.acq_time}</p>
+              <p>Satellite: {point.satellite}</p>
+              <p>Confidence: {point.confidence}</p>
+              <p>Radiative Power: {parseFloat(point.frp).toFixed(2)} MW</p>
+              <p>Country: {point.country_id}</p>
+              <p>Day/Night: {point.daynight === 'D' ? 'Day' : 'Night'}</p>
+              <p>Instrument: {point.instrument}</p>
+              <p>Scan: {point.scan}</p>
+              <p>Track: {point.track}</p>
+              <p>Version: {point.version}</p>
             </div>
           </Popup>
         </Marker>

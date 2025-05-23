@@ -14,52 +14,52 @@
     <h1>FIRMS API Test</h1>
     
     <div>
-        <label>查询方式:</label>
+        <label>Query Mode:</label>
         <select id="mode">
-            <option value="country">国家</option>
-            <option value="bbox">坐标</option>
+            <option value="country">Country</option>
+            <option value="bbox">Coordinates</option>
         </select>
     </div>
     
     <div id="countryDiv">
-        <label>国家代码:</label>
+        <label>Country Code:</label>
         <input type="text" id="country" value="USA">
     </div>
     
     <div id="bboxDiv" style="display: none;">
-        <label>西经:</label>
+        <label>West Longitude:</label>
         <input type="number" id="west" value="-125">
-        <label>南纬:</label>
+        <label>South Latitude:</label>
         <input type="number" id="south" value="30">
-        <label>东经:</label>
+        <label>East Longitude:</label>
         <input type="number" id="east" value="-120">
-        <label>北纬:</label>
+        <label>North Latitude:</label>
         <input type="number" id="north" value="35">
     </div>
     
     <div>
-        <label>开始日期:</label>
+        <label>Start Date:</label>
         <input type="date" id="startDate" value="2025-05-20">
-        <label>结束日期:</label>
+        <label>End Date:</label>
         <input type="date" id="endDate" value="2025-05-21">
     </div>
     
-    <button id="fetchBtn">获取数据</button>
+    <button id="fetchBtn">Fetch Data</button>
     
     <div class="results">
-        <h3>请求URL:</h3>
+        <h3>Request URL:</h3>
         <pre id="requestUrl"></pre>
         
-        <h3>响应状态:</h3>
+        <h3>Response Status:</h3>
         <pre id="status"></pre>
         
-        <h3>记录数量:</h3>
+        <h3>Record Count:</h3>
         <pre id="count"></pre>
         
-        <h3>原始响应:</h3>
+        <h3>Raw Response:</h3>
         <pre id="rawResponse"></pre>
         
-        <h3>前三条记录:</h3>
+        <h3>First Three Records:</h3>
         <pre id="firstRecords"></pre>
     </div>
     

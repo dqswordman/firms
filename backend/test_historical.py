@@ -5,55 +5,55 @@ from datetime import datetime, timedelta
 def test_historical_data():
     base_url = "http://localhost:8000/fires"
     
-    # 获取当前日期
+    # Get current date
     today = datetime.utcnow().date()
     
-    # 测试不同历史时期
+    # Test different historical periods
     date_ranges = [
         {
-            "name": "最近数据（NRT）",
+            "name": "Recent Data (NRT)",
             "start": (today - timedelta(days=3)).strftime("%Y-%m-%d"),
             "end": (today - timedelta(days=2)).strftime("%Y-%m-%d")
         },
         {
-            "name": "近期数据（SP）",
+            "name": "Recent Data (SP)",
             "start": (today - timedelta(days=15)).strftime("%Y-%m-%d"),
             "end": (today - timedelta(days=14)).strftime("%Y-%m-%d")
         },
         {
-            "name": "2023年数据",
+            "name": "2023 Data",
             "start": "2023-05-01",
             "end": "2023-05-02"
         },
         {
-            "name": "2022年数据",
+            "name": "2022 Data",
             "start": "2022-05-01",
             "end": "2022-05-02"
         },
         {
-            "name": "2021年数据",
+            "name": "2021 Data",
             "start": "2021-05-01",
             "end": "2021-05-02"
         },
         {
-            "name": "2020年数据",
+            "name": "2020 Data",
             "start": "2020-05-01",
             "end": "2020-05-02"
         }
     ]
     
-    print("正在测试历史数据查询能力...")
+    print("Testing historical data query capabilities...")
     print("-" * 50)
     
     for date_range in date_ranges:
-        # 测试国家查询
+        # Test country query
         country_params = {
             "country": "USA",
             "start_date": date_range["start"],
             "end_date": date_range["end"]
         }
         
-        # 测试坐标范围查询
+        # Test coordinate range query
         bbox_params = {
             "west": -125.0,
             "south": 30.0,
@@ -63,43 +63,43 @@ def test_historical_data():
             "end_date": date_range["end"]
         }
         
-        print(f"\n测试 {date_range['name']}: {date_range['start']} 到 {date_range['end']}")
+        print(f"\nTesting {date_range['name']}: {date_range['start']} to {date_range['end']}")
         
-        # 测试国家查询
-        print("\n1. 国家查询测试:")
-        print(f"参数: {country_params}")
+        # Test country query
+        print("\n1. Country Query Test:")
+        print(f"Parameters: {country_params}")
         try:
             response = requests.get(base_url, params=country_params)
-            print(f"状态码: {response.status_code}")
+            print(f"Status Code: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
-                print(f"返回数据条数: {len(data)}")
+                print(f"Number of records: {len(data)}")
                 if len(data) > 0:
-                    print("示例数据 (第一条):")
+                    print("Sample data (first record):")
                     print(json.dumps(data[0], indent=2, ensure_ascii=False))
             else:
-                print(f"请求失败: {response.text}")
+                print(f"Request failed: {response.text}")
         except Exception as e:
-            print(f"请求异常: {str(e)}")
+            print(f"Request error: {str(e)}")
         
-        # 测试坐标范围查询
-        print("\n2. 坐标范围查询测试:")
-        print(f"参数: {bbox_params}")
+        # Test coordinate range query
+        print("\n2. Coordinate Range Query Test:")
+        print(f"Parameters: {bbox_params}")
         try:
             response = requests.get(base_url, params=bbox_params)
-            print(f"状态码: {response.status_code}")
+            print(f"Status Code: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
-                print(f"返回数据条数: {len(data)}")
+                print(f"Number of records: {len(data)}")
                 if len(data) > 0:
-                    print("示例数据 (第一条):")
+                    print("Sample data (first record):")
                     print(json.dumps(data[0], indent=2, ensure_ascii=False))
             else:
-                print(f"请求失败: {response.text}")
+                print(f"Request failed: {response.text}")
         except Exception as e:
-            print(f"请求异常: {str(e)}")
+            print(f"Request error: {str(e)}")
         
         print("-" * 50)
 

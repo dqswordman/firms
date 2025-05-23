@@ -53,7 +53,7 @@ const App: React.FC = () => {
       )}
       {loading && (
         <div className="absolute top-20 left-4 z-[1000] p-4 bg-blue-100 text-blue-700 rounded shadow-lg">
-          加载中...
+          Loading...
         </div>
       )}
     </div>
