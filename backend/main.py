@@ -15,10 +15,11 @@ load_dotenv()
 app = FastAPI(title="Wildfire Visualization API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React development server
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],  # More permissive during development
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # NASA FIRMS API configuration
@@ -55,7 +56,47 @@ def _fetch_firms_data(url: str) -> List[Dict]:
         # If only headers exist (single row with all empty values), return empty list
         if len(data) == 1 and all(not v for v in data[0].values()):
             return []
-        return data
+            
+        # Transform data to match frontend expected format
+        transformed_data = []
+        for row in data:
+            # Print raw row data to debug field names
+            print(f"Raw row data: {row}")
+            
+            transformed_row = {}
+            
+            # Map common field name variations
+            field_mappings = {
+                'latitude': ['latitude', 'lat'],
+                'longitude': ['longitude', 'lon', 'long'],
+                'bright_ti4': ['bright_ti4', 'brightness', 'bright_t31'],
+                'bright_ti5': ['bright_ti5', 'bright_t21', 'bright_t22'],
+                'frp': ['frp', 'fire_radiative_power'],
+                'acq_date': ['acq_date', 'acquisition_date', 'date'],
+                'acq_time': ['acq_time', 'acquisition_time', 'time'],
+                'confidence': ['confidence', 'conf'],
+                'satellite': ['satellite', 'satellite_name'],
+                'instrument': ['instrument', 'instrument_name'],
+                'daynight': ['daynight', 'day_night'],
+            }
+            
+            # Apply field mappings
+            for target_field, source_fields in field_mappings.items():
+                for source in source_fields:
+                    for key in row.keys():
+                        if key.lower() == source.lower():
+                            transformed_row[target_field] = row[key]
+                            break
+            
+            # Ensure all required fields exist
+            required_fields = ['latitude', 'longitude', 'bright_ti4', 'acq_date', 'acq_time']
+            for field in required_fields:
+                if field not in transformed_row:
+                    transformed_row[field] = ""
+            
+            transformed_data.append(transformed_row)
+            
+        return transformed_data
     except requests.Timeout as e:
         raise HTTPException(
             504,
@@ -79,6 +120,31 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/debug")
+async def debug_endpoint():
+    """Debug endpoint to check raw response from FIRMS API"""
+    try:
+        # Use a known good request to USA for a short date range
+        url = f"https://firms.modaps.eosdis.nasa.gov/api/country/csv/{MAP_KEY}/USA/1/2023-07-01"
+        session = requests.Session()
+        session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
+        resp = session.get(url, timeout=(30, 120))
+        resp.raise_for_status()
+        
+        # Parse the first few rows of CSV data to see structure
+        data = list(csv.DictReader(io.StringIO(resp.text)))[:5]
+        
+        # Return debug information
+        return {
+            "status": resp.status_code,
+            "content_type": resp.headers.get('Content-Type', ''),
+            "sample_data": data,
+            "column_names": list(data[0].keys()) if data else [],
+            "transformed_sample": _fetch_firms_data(url)[:5]
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/fires", response_model=List[Dict])
 def get_fires(
@@ -117,18 +183,27 @@ def get_fires(
 
     # 3) Construct FIRMS URL
     fmt = "csv"             # Official /country /area endpoints only support csv
-    base = f"https://firms.modaps.eosdis.nasa.gov/api/{mode}/{fmt}/{MAP_KEY}"
     
     # Build query parameters
     day_range = (end - start).days + 1
+    
     if mode == "country":
+        base = f"https://firms.modaps.eosdis.nasa.gov/api/{mode}/{fmt}/{MAP_KEY}"
         query_params = f"/{country.upper()}/{day_range}/{start.isoformat()}"
-    else:
-        bbox = f"{west},{south},{east},{north}"
-        query_params = f"/{bbox}/{day_range}/{start.isoformat()}"
+    else:  # bbox mode
+        base = f"https://firms.modaps.eosdis.nasa.gov/api/area/{fmt}/{MAP_KEY}"
+        # 按照官方规范格式: .../{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}
+        # 注意不需要先组装bbox，直接按顺序放入参数
+        query_params = ""  # 在bbox模式下，直接在URL中添加数据源和参数
 
     # 4) Try NRT data first
-    nrt_url = f"{base}/VIIRS_SNPP_NRT{query_params}"
+    if mode == "country":
+        nrt_url = f"{base}/VIIRS_SNPP_NRT{query_params}"
+    else:  # bbox mode
+        # 对于bbox模式，按照官方规范直接构建完整URL
+        nrt_url = f"{base}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
+        
+    print(f"DEBUG - NRT URL: {nrt_url}")  # 调试打印URL
     nrt_data = _fetch_firms_data(nrt_url)
     
     # If NRT has data, return directly
@@ -136,8 +211,66 @@ def get_fires(
         return nrt_data
     
     # 5) If no NRT data, try SP data
-    sp_url = f"{base}/VIIRS_SNPP_SP{query_params}"
+    if mode == "country":
+        sp_url = f"{base}/VIIRS_SNPP_SP{query_params}"
+    else:  # bbox mode
+        # 对于bbox模式，按照官方规范直接构建完整URL
+        sp_url = f"{base}/VIIRS_SNPP_SP/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
+        
+    print(f"DEBUG - SP URL: {sp_url}")  # 调试打印URL
     sp_data = _fetch_firms_data(sp_url)
     
     # If no SP data either, return empty array
     return sp_data 
+
+@app.get("/cors-test")
+async def cors_test():
+    """Test endpoint to verify CORS is working properly"""
+    return {
+        "status": "success",
+        "message": "CORS is properly configured",
+        "allow_origins": ["http://localhost:3000"],
+        "test_data": [
+            {"latitude": "34.0522", "longitude": "-118.2437", "bright_ti4": "310.5", 
+             "acq_date": "2023-07-01", "acq_time": "1200"}
+        ]
+    } 
+
+@app.get("/debug-bbox")
+async def debug_bbox_endpoint():
+    """Debug endpoint to check BBOX API calls"""
+    try:
+        # 使用示例边界坐标进行测试
+        west = -100.0
+        south = 30.0
+        east = -80.0
+        north = 40.0
+        day_range = 1
+        start_date = "2023-07-01"
+        
+        # 构建API URL - 使用area而不是bbox作为端点
+        base_url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{MAP_KEY}"
+        
+        # 按照官方规范构建URL
+        # .../{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}
+        nrt_url = f"{base_url}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/{day_range}/{start_date}"
+        sp_url = f"{base_url}/VIIRS_SNPP_SP/{west},{south},{east},{north}/{day_range}/{start_date}"
+        
+        # 尝试调用API
+        session = requests.Session()
+        session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
+        
+        # 仅测试一个API调用的响应
+        resp = session.get(nrt_url, timeout=(30, 120))
+        
+        # 返回调试信息
+        return {
+            "nrt_url": nrt_url,
+            "sp_url": sp_url,
+            "status_code": resp.status_code,
+            "content_type": resp.headers.get('Content-Type', ''),
+            "raw_response": resp.text[:500] if resp.status_code == 200 else resp.text,
+            "transformed_sample": _fetch_firms_data(nrt_url)[:5] if resp.status_code == 200 else []
+        }
+    except Exception as e:
+        return {"error": str(e), "type": str(type(e))} 

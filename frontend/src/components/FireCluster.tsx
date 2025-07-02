@@ -26,7 +26,9 @@ const FireCluster: React.FC<FireClusterProps> = ({ firePoints }) => {
   const map = useMap();
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
 
-  const getColorForConfidence = (confidence: string): string => {
+  const getColorForConfidence = (confidence: string | undefined): string => {
+    if (!confidence) return '#808080'; // Gray for unknown confidence
+    
     const conf = confidence.toLowerCase();
     if (conf === 'h' || (conf.match(/^\d+$/) && parseInt(conf) >= 80)) {
       return '#FF0000'; // Red for high confidence
@@ -101,9 +103,7 @@ const FireCluster: React.FC<FireClusterProps> = ({ firePoints }) => {
     firePoints.forEach((point) => {
       const lat = parseFloat(point.latitude);
       const lng = parseFloat(point.longitude);
-      const confidence = point.confidence;
-      const color = getColorForConfidence(confidence);
-
+      
       if (isNaN(lat) || isNaN(lng)) {
         console.error('Invalid coordinates for point:', point);
         return;
@@ -111,30 +111,72 @@ const FireCluster: React.FC<FireClusterProps> = ({ firePoints }) => {
 
       const marker = L.circleMarker([lat, lng], {
         radius: 5,
-        fillColor: color,
+        fillColor: getColorForConfidence(point.confidence),
         fillOpacity: 0.7,
         color: 'transparent'
       });
 
-      marker.bindPopup(`
+      // Safely build the popup content
+      let popupContent = `
         <div class="text-sm">
           <h3 class="font-bold mb-2">Fire Point Details</h3>
-          <p><span class="font-semibold">Confidence:</span> ${confidence}</p>
-          <p><span class="font-semibold">Brightness (TI4):</span> ${parseFloat(point.bright_ti4).toFixed(2)}K</p>
-          <p><span class="font-semibold">Brightness (TI5):</span> ${parseFloat(point.bright_ti5).toFixed(2)}K</p>
-          <p><span class="font-semibold">Date:</span> ${point.acq_date}</p>
-          <p><span class="font-semibold">Time:</span> ${point.acq_time}</p>
-          <p><span class="font-semibold">Satellite:</span> ${point.satellite}</p>
-          <p><span class="font-semibold">Radiative Power:</span> ${parseFloat(point.frp).toFixed(2)} MW</p>
-          <p><span class="font-semibold">Country:</span> ${point.country_id}</p>
-          <p><span class="font-semibold">Day/Night:</span> ${point.daynight === 'D' ? 'Day' : 'Night'}</p>
-          <p><span class="font-semibold">Instrument:</span> ${point.instrument}</p>
-          <p><span class="font-semibold">Scan:</span> ${point.scan}</p>
-          <p><span class="font-semibold">Track:</span> ${point.track}</p>
-          <p><span class="font-semibold">Version:</span> ${point.version}</p>
-        </div>
-      `);
-
+      `;
+      
+      // Add fields only if they exist
+      if (point.confidence) {
+        popupContent += `<p><span class="font-semibold">Confidence:</span> ${point.confidence}</p>`;
+      }
+      
+      if (point.bright_ti4 && !isNaN(parseFloat(point.bright_ti4))) {
+        popupContent += `<p><span class="font-semibold">Brightness (TI4):</span> ${parseFloat(point.bright_ti4).toFixed(2)}K</p>`;
+      }
+      
+      if (point.bright_ti5 && !isNaN(parseFloat(point.bright_ti5))) {
+        popupContent += `<p><span class="font-semibold">Brightness (TI5):</span> ${parseFloat(point.bright_ti5).toFixed(2)}K</p>`;
+      }
+      
+      // Date is a required field
+      popupContent += `<p><span class="font-semibold">Date:</span> ${point.acq_date || 'Unknown'}</p>`;
+      
+      if (point.acq_time) {
+        popupContent += `<p><span class="font-semibold">Time:</span> ${point.acq_time}</p>`;
+      }
+      
+      if (point.satellite) {
+        popupContent += `<p><span class="font-semibold">Satellite:</span> ${point.satellite}</p>`;
+      }
+      
+      if (point.frp && !isNaN(parseFloat(point.frp))) {
+        popupContent += `<p><span class="font-semibold">Radiative Power:</span> ${parseFloat(point.frp).toFixed(2)} MW</p>`;
+      }
+      
+      if (point.country_id) {
+        popupContent += `<p><span class="font-semibold">Country:</span> ${point.country_id}</p>`;
+      }
+      
+      if (point.daynight) {
+        popupContent += `<p><span class="font-semibold">Day/Night:</span> ${point.daynight === 'D' ? 'Day' : 'Night'}</p>`;
+      }
+      
+      if (point.instrument) {
+        popupContent += `<p><span class="font-semibold">Instrument:</span> ${point.instrument}</p>`;
+      }
+      
+      if (point.scan) {
+        popupContent += `<p><span class="font-semibold">Scan:</span> ${point.scan}</p>`;
+      }
+      
+      if (point.track) {
+        popupContent += `<p><span class="font-semibold">Track:</span> ${point.track}</p>`;
+      }
+      
+      if (point.version) {
+        popupContent += `<p><span class="font-semibold">Version:</span> ${point.version}</p>`;
+      }
+      
+      popupContent += `</div>`;
+      
+      marker.bindPopup(popupContent);
       clusterGroup.addLayer(marker);
     });
 

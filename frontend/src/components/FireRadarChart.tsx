@@ -42,9 +42,9 @@ const FireRadarChart: React.FC<FireRadarChartProps> = ({ firePoints }) => {
 
     // FRP (Fire Radiative Power) levels with adjusted thresholds
     const frpStats = {
-      high: firePoints.filter(point => parseFloat(point.frp) >= 20).length,    // Changed from 50 to 20
-      medium: firePoints.filter(point => parseFloat(point.frp) >= 5 && parseFloat(point.frp) < 20).length,  // Changed from 10-50 to 5-20
-      low: firePoints.filter(point => parseFloat(point.frp) < 5).length        // Changed from <10 to <5
+      high: firePoints.filter(point => point.frp && parseFloat(point.frp) >= 20).length,    // Changed from 50 to 20
+      medium: firePoints.filter(point => point.frp && parseFloat(point.frp) >= 5 && parseFloat(point.frp) < 20).length,  // Changed from 10-50 to 5-20
+      low: firePoints.filter(point => point.frp && parseFloat(point.frp) < 5).length        // Changed from <10 to <5
     };
 
     // Day/Night distribution

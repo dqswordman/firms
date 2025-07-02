@@ -94,6 +94,25 @@ Now you can access the application at http://localhost:3000 in your browser.
    - Support map zoom and pan
    - Multiple visualization layers for comprehensive analysis
 
+## Changelog
+
+### July 2, 2025
+- **Frontend Improvements:**
+  - Fixed TypeScript errors related to optional fields in FirePoint interface
+  - Enhanced components to handle missing data gracefully (FireRadarChart, FireStatsPanel, FireTrendChart)
+  - Improved error handling in data visualization components
+
+- **Backend API Updates:**
+  - Fixed geographic boundary query to align with NASA FIRMS API specifications
+  - Corrected URL construction for area-based queries
+  - Added debugging endpoints for easier troubleshooting
+  - Maintained backward compatibility for country-based queries
+
+- **General Enhancements:**
+  - Increased application robustness for varying data formats
+  - Improved error reporting and handling
+  - Enhanced data validation throughout the application
+
 ## Technology Stack
 
 ### Frontend

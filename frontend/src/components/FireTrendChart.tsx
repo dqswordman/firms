@@ -71,7 +71,9 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
       const stats = statsMap.get(dateStr);
       if (stats) {
         stats.count += 1;
-        stats.totalFrp += parseFloat(point.frp);
+        if (point.frp) {
+          stats.totalFrp += parseFloat(point.frp);
+        }
       }
     });
 

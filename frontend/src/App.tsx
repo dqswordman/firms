@@ -26,14 +26,69 @@ const App: React.FC = () => {
       queryParams.append('start_date', params.startDate);
       queryParams.append('end_date', params.endDate);
 
-      const response = await fetch(`http://localhost:8000/fires?${queryParams}`);
+      const url = `http://localhost:8000/fires?${queryParams}`;
+      console.log('Fetching from URL:', url);
+      
+      // Use fetch with explicit CORS mode
+      const response = await fetch(url, {
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      console.log('Raw response status:', response.status);
+      console.log('Raw response headers:', Array.from(response.headers.entries()));
+      
+      const responseText = await response.text();
+      console.log('Raw response text:', responseText);
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to fetch fire data');
+        try {
+          const error = JSON.parse(responseText);
+          throw new Error(error.detail || 'Failed to fetch fire data');
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
       }
 
-      const data = await response.json();
-      console.log('Received data:', data);
+      // Check if response is empty
+      if (!responseText.trim()) {
+        console.warn('Empty response received from server');
+        setFirePoints([]);
+        return;
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('Successfully parsed JSON data');
+      } catch (parseError) {
+        console.error('Error parsing JSON response:', parseError);
+        console.error('Response text that failed to parse:', responseText);
+        throw new Error('Invalid data format received from server');
+      }
+      
+      console.log('Parsed data:', data);
+      
+      if (!Array.isArray(data)) {
+        console.error('Expected array data but received:', typeof data, data);
+        throw new Error('Expected array data but received different format');
+      }
+      
+      // Validate some required fields in the first item if it exists
+      if (data.length > 0) {
+        const firstItem = data[0];
+        console.log('First data item:', firstItem);
+        
+        const requiredFields = ['latitude', 'longitude', 'acq_date'];
+        const missingFields = requiredFields.filter(field => !firstItem[field]);
+        
+        if (missingFields.length > 0) {
+          console.warn('Missing required fields in data:', missingFields);
+        }
+      }
+      
       setFirePoints(data);
     } catch (err) {
       console.error('Error fetching data:', err);

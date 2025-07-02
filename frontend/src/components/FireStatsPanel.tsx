@@ -36,7 +36,7 @@ const FireStatsPanel: React.FC<FireStatsPanelProps> = ({ firePoints, currentDate
     let aquaCount = 0;
 
     firePoints.forEach(point => {
-      const frp = parseFloat(point.frp);
+      const frp = point.frp ? parseFloat(point.frp) : 0;
       totalFrp += frp;
       maxFrp = Math.max(maxFrp, frp);
 
@@ -46,21 +46,31 @@ const FireStatsPanel: React.FC<FireStatsPanelProps> = ({ firePoints, currentDate
         nightCount++;
       }
 
-      const confidence = point.confidence.toLowerCase();
-      if (confidence === 'h' || (confidence.match(/^\d+$/) && parseInt(confidence) >= 80)) {
-        highConfidence++;
-      } else if (confidence === 'n' || (confidence.match(/^\d+$/) && parseInt(confidence) >= 30)) {
-        mediumConfidence++;
+      if (point.confidence) {
+        const confidence = point.confidence.toLowerCase();
+        if (confidence === 'h' || (confidence.match(/^\d+$/) && parseInt(confidence) >= 80)) {
+          highConfidence++;
+        } else if (confidence === 'n' || (confidence.match(/^\d+$/) && parseInt(confidence) >= 30)) {
+          mediumConfidence++;
+        } else {
+          lowConfidence++;
+        }
       } else {
+        // If confidence is undefined, count as low confidence
         lowConfidence++;
       }
 
-      const satellite = point.satellite.toUpperCase();
-      if (satellite.startsWith('N')) {
-        viirsCount++;
-      } else if (satellite === 'T') {
-        terraCount++;
+      if (point.satellite) {
+        const satellite = point.satellite.toUpperCase();
+        if (satellite.startsWith('N')) {
+          viirsCount++;
+        } else if (satellite === 'T') {
+          terraCount++;
+        } else {
+          aquaCount++;
+        }
       } else {
+        // If satellite is undefined, count as other
         aquaCount++;
       }
     });
