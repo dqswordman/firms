@@ -4,17 +4,17 @@ A global wildfire data visualization system based on NASA FIRMS API, supporting 
 
 ## Features
 
-- 🌍 Global wildfire data visualization with interactive map
-- 🔍 Country or region-based query support
-- 📅 Time series data display with date slider
-- 🎯 Detailed wildfire point information
-- 📊 Multiple visualization layers:
+- Global wildfire data visualization with an interactive map
+- Country or region-based query support
+- Time series data display with a date slider
+- Detailed wildfire point information
+- Multiple visualization layers:
   - Heatmap (always visible)
   - Clusters (always visible)
   - Statistics Panel (toggleable)
   - Trend Chart (toggleable)
   - Radar Chart (toggleable)
-- 📱 Responsive design with modern UI
+- Responsive design with a modern interface
 
 ## Quick Start
 
