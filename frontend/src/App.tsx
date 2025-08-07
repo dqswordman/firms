@@ -11,7 +11,7 @@ const App: React.FC = () => {
   const handleSearch = async (params: SearchParams) => {
     setLoading(true);
     setError(null);
-    setFirePoints([]); // 清除之前的点
+    setFirePoints([]); // Clear previous points
 
     try {
       const queryParams = new URLSearchParams();

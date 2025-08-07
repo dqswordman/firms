@@ -11,7 +11,7 @@ interface TimeSliderProps {
 const TimeSlider: React.FC<TimeSliderProps> = ({ dates, currentDate, onTimeChange }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // 当日期列表或当前日期变化时，更新滑块位置
+  // Update slider position when the date list or current date changes
   useEffect(() => {
     if (dates.length > 0) {
       const index = dates.indexOf(currentDate);
@@ -93,4 +93,4 @@ const TimeSlider: React.FC<TimeSliderProps> = ({ dates, currentDate, onTimeChang
   );
 };
 
-export default TimeSlider; 
+export default TimeSlider;

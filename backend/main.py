@@ -112,7 +112,7 @@ def _fetch_firms_data(url: str) -> List[Dict]:
             "If failing repeatedly, try reducing the time span or using coordinate query."
         )
 
-# ---------- 核心路由 ----------
+# ---------- Core Routes ----------
 @app.get("/")
 async def root():
     return {"message": "Welcome to Wildfire Visualization API"}
@@ -192,18 +192,18 @@ def get_fires(
         query_params = f"/{country.upper()}/{day_range}/{start.isoformat()}"
     else:  # bbox mode
         base = f"https://firms.modaps.eosdis.nasa.gov/api/area/{fmt}/{MAP_KEY}"
-        # 按照官方规范格式: .../{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}
-        # 注意不需要先组装bbox，直接按顺序放入参数
-        query_params = ""  # 在bbox模式下，直接在URL中添加数据源和参数
+        # According to official format: .../{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}
+        # No need to assemble the bbox; parameters are placed in order
+        query_params = ""  # In bbox mode, add data source and parameters directly in the URL
 
     # 4) Try NRT data first
     if mode == "country":
         nrt_url = f"{base}/VIIRS_SNPP_NRT{query_params}"
     else:  # bbox mode
-        # 对于bbox模式，按照官方规范直接构建完整URL
+        # For bbox mode, construct the full URL directly per official spec
         nrt_url = f"{base}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
         
-    print(f"DEBUG - NRT URL: {nrt_url}")  # 调试打印URL
+    print(f"DEBUG - NRT URL: {nrt_url}")  # Debug print URL
     nrt_data = _fetch_firms_data(nrt_url)
     
     # If NRT has data, return directly
@@ -214,10 +214,10 @@ def get_fires(
     if mode == "country":
         sp_url = f"{base}/VIIRS_SNPP_SP{query_params}"
     else:  # bbox mode
-        # 对于bbox模式，按照官方规范直接构建完整URL
+        # For bbox mode, construct the full URL directly per official spec
         sp_url = f"{base}/VIIRS_SNPP_SP/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
         
-    print(f"DEBUG - SP URL: {sp_url}")  # 调试打印URL
+    print(f"DEBUG - SP URL: {sp_url}")  # Debug print URL
     sp_data = _fetch_firms_data(sp_url)
     
     # If no SP data either, return empty array
@@ -240,7 +240,7 @@ async def cors_test():
 async def debug_bbox_endpoint():
     """Debug endpoint to check BBOX API calls"""
     try:
-        # 使用示例边界坐标进行测试
+        # Use sample boundary coordinates for testing
         west = -100.0
         south = 30.0
         east = -80.0
@@ -248,22 +248,22 @@ async def debug_bbox_endpoint():
         day_range = 1
         start_date = "2023-07-01"
         
-        # 构建API URL - 使用area而不是bbox作为端点
+        # Build API URL - use 'area' instead of 'bbox' endpoint
         base_url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{MAP_KEY}"
         
-        # 按照官方规范构建URL
+        # Construct the URL according to official specs
         # .../{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}
         nrt_url = f"{base_url}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/{day_range}/{start_date}"
         sp_url = f"{base_url}/VIIRS_SNPP_SP/{west},{south},{east},{north}/{day_range}/{start_date}"
         
-        # 尝试调用API
+        # Try calling the API
         session = requests.Session()
         session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
         
-        # 仅测试一个API调用的响应
+        # Test the response of a single API call
         resp = session.get(nrt_url, timeout=(30, 120))
         
-        # 返回调试信息
+        # Return debug information
         return {
             "nrt_url": nrt_url,
             "sp_url": sp_url,
