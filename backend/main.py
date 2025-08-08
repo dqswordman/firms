@@ -1,5 +1,4 @@
 import os
-import re
 import csv
 import io
 import requests
@@ -9,6 +8,7 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
+from services.geo import validate_country, country_to_bbox
 
 # Configure CORS
 load_dotenv()
@@ -40,7 +40,6 @@ SOURCE_WHITELIST = {
     "MODIS_SP",
     "LANDSAT_NRT",
 }
-ISO3_RE = re.compile(r"^[A-Z]{3}$")
 
 # ---------- Utility Functions ----------
 def _parse_date(d: Optional[str]) -> datetime.date:
@@ -160,29 +159,34 @@ async def debug_endpoint():
 @app.get("/fires", response_model=List[Dict])
 def get_fires(
     country: Optional[str] = Query(None),
-    west:  Optional[float] = None,
+    west: Optional[float] = None,
     south: Optional[float] = None,
-    east:  Optional[float] = None,
+    east: Optional[float] = None,
     north: Optional[float] = None,
     start_date: Optional[str] = None,
-    end_date:   Optional[str] = None,
+    end_date: Optional[str] = None,
     source: str = Query("VIIRS_SNPP_NRT"),
 ):
-    # 1) Determine query mode
+    # 1) Validate and prepare query region
     if country:
-        mode = "country"
-        if not ISO3_RE.fullmatch(country.upper()):
-            raise HTTPException(400, "Country code must be 3 uppercase letters")
-    elif None not in (west,south,east,north):
-        mode = "bbox"
-        if not _bbox_ok(west,south,east,north):
+        country = country.upper()
+        if not validate_country(country):
+            raise HTTPException(400, "Invalid ISO-3 country code")
+
+    if None not in (west, south, east, north):
+        if not _bbox_ok(west, south, east, north):
             raise HTTPException(400, "Invalid coordinate range")
+    elif country:
+        bbox = country_to_bbox(country)
+        if not bbox:
+            raise HTTPException(400, "Invalid ISO-3 country code")
+        west, south, east, north = bbox
     else:
         raise HTTPException(400, "Must provide either country code or complete coordinate range")
 
     # 2) Process dates
     start = _parse_date(start_date)
-    end   = _parse_date(end_date)
+    end = _parse_date(end_date)
     now = datetime.utcnow().date()
 
     # Basic date rule checks
@@ -197,20 +201,13 @@ def get_fires(
     if source not in SOURCE_WHITELIST:
         raise HTTPException(400, "Invalid source dataset")
 
-    # 4) Construct FIRMS v4 URL
+    # 4) Construct FIRMS v4 URL using area query
     fmt = "csv"
     day_range = (end - start).days + 1
-
-    if mode == "country":
-        url = (
-            f"https://firms.modaps.eosdis.nasa.gov/api/country/{fmt}/"
-            f"{MAP_KEY}/{source}/{country.upper()}/{day_range}/{start.isoformat()}"
-        )
-    else:
-        url = (
-            f"https://firms.modaps.eosdis.nasa.gov/api/area/{fmt}/"
-            f"{MAP_KEY}/{source}/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
-        )
+    url = (
+        f"https://firms.modaps.eosdis.nasa.gov/api/area/{fmt}/"
+        f"{MAP_KEY}/{source}/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
+    )
 
     print(f"FIRMS request URL: {url}")
     return _fetch_firms_data(url)
