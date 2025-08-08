@@ -10,8 +10,8 @@
 ### 查询参数
 - `country`：国家 ISO3 代码，或使用 `west` `south` `east` `north` 指定区域。
 - `start_date`、`end_date`：日期范围，最大 10 天。
-- `source`：数据源，默认 `VIIRS_SNPP_NRT`。
-  可选：`VIIRS_NOAA21_NRT`、`VIIRS_NOAA20_NRT`、`VIIRS_SNPP_NRT`、`VIIRS_NOAA20_SP`、`VIIRS_SNPP_SP`、`MODIS_NRT`、`MODIS_SP`、`LANDSAT_NRT`。
+- `sourcePriority`：逗号分隔的数据源优先级，按顺序选用可用数据集。
+  默认顺序：`VIIRS_NOAA21_NRT,VIIRS_NOAA20_NRT,VIIRS_SNPP_NRT,MODIS_NRT,VIIRS_NOAA21_SP,VIIRS_NOAA20_SP,VIIRS_SNPP_SP,MODIS_SP`。
 
 国家列表来源于 NASA FIRMS `/api/countries/`，后端会缓存 24 小时并用于校验 ISO‑3 代码。
 当未提供 `west/south/east/north` 时，可根据合法的 `country` 自动派生外接盒作为兜底。
@@ -35,3 +35,9 @@
 `https://firms.modaps.eosdis.nasa.gov/api/area/csv/KEY/MODIS_NRT/world/3`
 
 上述 `{START_DATE}` 可选，未提供时默认为当前日期向前追溯 `{DAY_RANGE}` 天。
+
+## 选源逻辑与优先级
+
+调用 `/fires` 前会通过 `/api/data_availability` 检查各数据集的可用日期范围。
+按 `sourcePriority` 列表依次匹配请求的 `[start_date, end_date]`，优先选择 NRT 数据，当所选日期不在 NRT 范围内时自动回退至对应 SP 数据。
+若所有数据源均不覆盖请求区间，将返回空数组，并在响应头 `X-Data-Availability` 中标明原因。
