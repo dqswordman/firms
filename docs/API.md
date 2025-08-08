@@ -13,6 +13,9 @@
 - `source`：数据源，默认 `VIIRS_SNPP_NRT`。
   可选：`VIIRS_NOAA21_NRT`、`VIIRS_NOAA20_NRT`、`VIIRS_SNPP_NRT`、`VIIRS_NOAA20_SP`、`VIIRS_SNPP_SP`、`MODIS_NRT`、`MODIS_SP`、`LANDSAT_NRT`。
 
+国家列表来源于 NASA FIRMS `/api/countries/`，后端会缓存 24 小时并用于校验 ISO‑3 代码。
+当未提供 `west/south/east/north` 时，可根据合法的 `country` 自动派生外接盒作为兜底。
+
 后端使用 NASA FIRMS v4 CSV 端点：
 - Country：`/api/country/csv/{MAP_KEY}/{SOURCE}/{COUNTRY}/{DAY_RANGE}/{START_DATE}`
 - Area：`/api/area/csv/{MAP_KEY}/{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}`
