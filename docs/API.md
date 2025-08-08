@@ -74,6 +74,42 @@
 }
 ```
 
+## /fires/stats
+统计火点聚合数据，入参与 `/fires` 一致，新增 FRP 档位阈值可配置。
+
+### 查询参数
+- 与 `/fires` 相同的 `country` 或 `west/south/east/north`、`start_date`、`end_date`、`sourcePriority`。
+- `frpHigh`：FRP 高档位阈值，默认 20。
+- `frpMid`：FRP 中档位阈值，默认 5。
+
+### 返回字段
+返回结构与前端面板一致：
+`totalPoints`、`avgFrp`、`maxFrp`、`sumFrp`、`dayCount`、`nightCount`、
+`highConfidence`、`mediumConfidence`、`lowConfidence`、
+`viirsCount`、`terraCount`、`aquaCount`、
+`frpHighCount`、`frpMidCount`、`frpLowCount`。
+
+### 示例
+```json
+{
+  "totalPoints": 3,
+  "avgFrp": 12.67,
+  "maxFrp": 25.0,
+  "sumFrp": 38.0,
+  "dayCount": 2,
+  "nightCount": 1,
+  "highConfidence": 1,
+  "mediumConfidence": 1,
+  "lowConfidence": 1,
+  "viirsCount": 1,
+  "terraCount": 1,
+  "aquaCount": 1,
+  "frpHighCount": 1,
+  "frpMidCount": 1,
+  "frpLowCount": 1
+}
+```
+
 ## URL 拼接规范与样例
 
 ### Country

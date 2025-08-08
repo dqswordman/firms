@@ -4,7 +4,7 @@ import io
 import json
 import asyncio
 from datetime import datetime
-from typing import Optional, List, Dict, AsyncGenerator
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 import requests
@@ -226,6 +226,175 @@ async def _stream_firms_data_async(
                 continue
             yield _transform_row(row, source)
 
+
+def compute_stats(
+    points: List[Dict], frp_mid: float = 5, frp_high: float = 20
+) -> Dict[str, Any]:
+    """Aggregate fire point statistics."""
+    total = len(points)
+    stats = {
+        "totalPoints": total,
+        "avgFrp": 0.0,
+        "maxFrp": 0.0,
+        "sumFrp": 0.0,
+        "dayCount": 0,
+        "nightCount": 0,
+        "highConfidence": 0,
+        "mediumConfidence": 0,
+        "lowConfidence": 0,
+        "viirsCount": 0,
+        "terraCount": 0,
+        "aquaCount": 0,
+        "frpHighCount": 0,
+        "frpMidCount": 0,
+        "frpLowCount": 0,
+    }
+    if total == 0:
+        return stats
+
+    for p in points:
+        frp = float(p.get("frp") or 0)
+        stats["sumFrp"] += frp
+        stats["maxFrp"] = max(stats["maxFrp"], frp)
+        if frp >= frp_high:
+            stats["frpHighCount"] += 1
+        elif frp >= frp_mid:
+            stats["frpMidCount"] += 1
+        else:
+            stats["frpLowCount"] += 1
+
+        if p.get("daynight", "").upper() == "D":
+            stats["dayCount"] += 1
+        else:
+            stats["nightCount"] += 1
+
+        conf = str(p.get("confidence", "")).lower()
+        if conf == "h" or (conf.isdigit() and int(conf) >= 80):
+            stats["highConfidence"] += 1
+        elif conf == "n" or (conf.isdigit() and int(conf) >= 30):
+            stats["mediumConfidence"] += 1
+        else:
+            stats["lowConfidence"] += 1
+
+        sat = (p.get("satellite") or "").upper()
+        if sat.startswith("N"):
+            stats["viirsCount"] += 1
+        elif sat == "T":
+            stats["terraCount"] += 1
+        else:
+            stats["aquaCount"] += 1
+
+    stats["avgFrp"] = stats["sumFrp"] / total if total else 0.0
+    return stats
+
+
+def _prepare_fire_query(
+    country: Optional[str],
+    west: Optional[float],
+    south: Optional[float],
+    east: Optional[float],
+    north: Optional[float],
+    start_date: Optional[str],
+    end_date: Optional[str],
+    source_priority: Optional[str],
+    response: Response,
+) -> Optional[Tuple[List[str], str]]:
+    """Validate parameters and compose request URLs."""
+    if country:
+        country = country.upper()
+        if not validate_country(country):
+            raise HTTPExceptionFactory.bad_request("Invalid ISO-3 country code")
+
+    if None not in (west, south, east, north):
+        if not _bbox_ok(west, south, east, north):
+            raise HTTPExceptionFactory.bad_request("Invalid coordinate range")
+    elif country:
+        bbox = country_to_bbox(country)
+        if not bbox:
+            raise HTTPExceptionFactory.bad_request("Invalid ISO-3 country code")
+        west, south, east, north = bbox
+    else:
+        raise HTTPExceptionFactory.bad_request(
+            "Must provide either country code or complete coordinate range"
+        )
+
+    start = _parse_date(start_date)
+    end = _parse_date(end_date)
+    now = datetime.utcnow().date()
+    if start > end:
+        raise HTTPExceptionFactory.bad_request(
+            "Start date must not be later than end date"
+        )
+    if end > now:
+        raise HTTPExceptionFactory.bad_request(
+            "End date cannot exceed today"
+        )
+
+    priorities = (
+        [s.strip().upper() for s in source_priority.split(",")]
+        if source_priority
+        else DEFAULT_SOURCE_PRIORITY
+    )
+    availability = check_data_availability(MAP_KEY, "ALL")
+    selected_source: Optional[str] = None
+    for src in priorities:
+        if src not in SOURCE_WHITELIST or src not in availability:
+            continue
+        min_d, max_d = availability[src]
+        min_d = datetime.strptime(min_d, "%Y-%m-%d").date()
+        max_d = datetime.strptime(max_d, "%Y-%m-%d").date()
+        if min_d <= start and end <= max_d:
+            selected_source = src
+            break
+    if not selected_source:
+        response.headers[
+            "X-Data-Availability"
+        ] = "No data available for requested date range"
+        return None
+
+    urls = compose_urls(
+        MAP_KEY,
+        selected_source,
+        start,
+        end,
+        area=(west, south, east, north),
+    )
+    return urls, selected_source
+
+
+async def _fetch_deduped_data(
+    urls: List[str], selected_source: str
+) -> List[Dict]:
+    """Fetch all URLs concurrently and deduplicate records."""
+    async with httpx.AsyncClient() as client:
+        sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
+        async def fetch(url: str) -> List[Dict]:
+            async with sem:
+                return await _fetch_firms_data_async(url, client, selected_source)
+
+        tasks = [asyncio.create_task(fetch(u)) for u in urls]
+        results = await asyncio.gather(*tasks)
+
+    merged: List[Dict] = []
+    for r in results:
+        merged.extend(r)
+
+    deduped: List[Dict] = []
+    seen = set()
+    for row in merged:
+        key = (
+            row.get("acq_date"),
+            row.get("acq_time"),
+            row.get("latitude"),
+            row.get("longitude"),
+            row.get("source"),
+        )
+        if key not in seen:
+            seen.add(key)
+            deduped.append(row)
+    return deduped
+
 # ---------- Core Routes ----------
 @app.get("/")
 async def root():
@@ -263,6 +432,9 @@ async def debug_endpoint():
     except Exception as e:
         return {"error": str(e)}
 
+        return to_geojson(deduped)
+    return deduped
+
 @app.get("/fires")
 async def get_fires(
     request: Request,
@@ -279,73 +451,20 @@ async def get_fires(
     ),
     format: str = Query("json", regex="^(json|geojson)$"),
 ):
-    # 1) Validate and prepare query region
-    if country:
-        country = country.upper()
-        if not validate_country(country):
-            raise HTTPExceptionFactory.bad_request("Invalid ISO-3 country code")
-
-    if None not in (west, south, east, north):
-        if not _bbox_ok(west, south, east, north):
-            raise HTTPExceptionFactory.bad_request("Invalid coordinate range")
-    elif country:
-        bbox = country_to_bbox(country)
-        if not bbox:
-            raise HTTPExceptionFactory.bad_request("Invalid ISO-3 country code")
-        west, south, east, north = bbox
-    else:
-        raise HTTPExceptionFactory.bad_request(
-            "Must provide either country code or complete coordinate range"
-        )
-
-    # 2) Process dates
-    start = _parse_date(start_date)
-    end = _parse_date(end_date)
-    now = datetime.utcnow().date()
-
-    # Basic date rule checks
-    if start > end:
-        raise HTTPExceptionFactory.bad_request(
-            "Start date must not be later than end date"
-        )
-    if end > now:
-        raise HTTPExceptionFactory.bad_request(
-            "End date cannot exceed today"
-        )
-
-    # 3) Determine data source based on availability
-    priorities = (
-        [s.strip().upper() for s in source_priority.split(",")]
-        if source_priority
-        else DEFAULT_SOURCE_PRIORITY
+    prepared = _prepare_fire_query(
+        country,
+        west,
+        south,
+        east,
+        north,
+        start_date,
+        end_date,
+        source_priority,
+        response,
     )
-    availability = check_data_availability(MAP_KEY, "ALL")
-    selected_source = None
-    for src in priorities:
-        if src not in SOURCE_WHITELIST:
-            continue
-        if src not in availability:
-            continue
-        min_d, max_d = availability[src]
-        min_d = datetime.strptime(min_d, "%Y-%m-%d").date()
-        max_d = datetime.strptime(max_d, "%Y-%m-%d").date()
-        if min_d <= start and end <= max_d:
-            selected_source = src
-            break
-    if not selected_source:
-        response.headers[
-            "X-Data-Availability"
-        ] = "No data available for requested date range"
+    if not prepared:
         return []
-
-    # 4) Generate URLs for the full date range and fetch concurrently
-    urls = compose_urls(
-        MAP_KEY,
-        selected_source,
-        start,
-        end,
-        area=(west, south, east, north),
-    )
+    urls, selected_source = prepared
 
     if "application/x-ndjson" in request.headers.get("accept", ""):
         async def ndjson_stream() -> AsyncGenerator[bytes, None]:
@@ -370,37 +489,43 @@ async def get_fires(
 
         return StreamingResponse(ndjson_stream(), media_type="application/x-ndjson")
 
-    async with httpx.AsyncClient() as client:
-        sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
-
-        async def fetch(url: str) -> List[Dict]:
-            async with sem:
-                return await _fetch_firms_data_async(url, client, selected_source)
-
-        tasks = [asyncio.create_task(fetch(u)) for u in urls]
-        results = await asyncio.gather(*tasks)
-
-    merged: List[Dict] = []
-    for r in results:
-        merged.extend(r)
-
-    deduped: List[Dict] = []
-    seen = set()
-    for row in merged:
-        key = (
-            row.get("acq_date"),
-            row.get("acq_time"),
-            row.get("latitude"),
-            row.get("longitude"),
-            row.get("source"),
-        )
-        if key not in seen:
-            seen.add(key)
-            deduped.append(row)
-
+    deduped = await _fetch_deduped_data(urls, selected_source)
     if format == "geojson":
         return to_geojson(deduped)
     return deduped
+
+@app.get("/fires/stats")
+async def get_fire_stats(
+    response: Response,
+    country: Optional[str] = Query(None),
+    west: Optional[float] = None,
+    south: Optional[float] = None,
+    east: Optional[float] = None,
+    north: Optional[float] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    source_priority: Optional[str] = Query(
+        None, alias="sourcePriority"
+    ),
+    frp_high: float = Query(20, alias="frpHigh"),
+    frp_mid: float = Query(5, alias="frpMid"),
+) -> Dict[str, Any]:
+    prepared = _prepare_fire_query(
+        country,
+        west,
+        south,
+        east,
+        north,
+        start_date,
+        end_date,
+        source_priority,
+        response,
+    )
+    data: List[Dict] = []
+    if prepared:
+        urls, selected_source = prepared
+        data = await _fetch_deduped_data(urls, selected_source)
+    return compute_stats(data, frp_mid, frp_high)
 
 @app.get("/cors-test")
 async def cors_test():
