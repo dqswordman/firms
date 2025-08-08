@@ -8,7 +8,8 @@ from typing import Optional, List, Dict, AsyncGenerator
 
 import httpx
 import requests
-from fastapi import FastAPI, Query, HTTPException, Response, Request
+import logging
+from fastapi import FastAPI, Query, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse
@@ -19,9 +20,11 @@ from services.geo import validate_country, country_to_bbox
 from utils.data_availability import check_data_availability
 from utils.urlbuilder import compose_urls
 from utils.geojson import to_geojson
+from utils.http_exceptions import HTTPExceptionFactory
 
 # Configure CORS
 load_dotenv()
+logger = logging.getLogger(__name__)
 app = FastAPI(title="Wildfire Visualization API")
 app.add_middleware(
     CORSMiddleware,
@@ -72,7 +75,9 @@ def _parse_date(d: Optional[str]) -> datetime.date:
     try:
         return datetime.strptime(d, "%Y-%m-%d").date()
     except ValueError:
-        raise HTTPException(400, "Date format must be YYYY-MM-DD")
+        raise HTTPExceptionFactory.bad_request(
+            "Date format must be YYYY-MM-DD"
+        )
 
 def _bbox_ok(w,s,e,n):
     return -180<=w<e<=180 and -90<=s<n<=90
@@ -112,66 +117,94 @@ def _transform_row(row: Dict, source: Optional[str] = None) -> Dict:
         transformed["source"] = source
     return transformed
 
-def _fetch_firms_data(url: str) -> List[Dict]:
-    """Fetch data from FIRMS API, return empty list if only headers exist"""
-    try:
-        session = requests.Session()
-        session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
-        resp = session.get(url, timeout=(30, 120))  # 30s connect, 120s read
-        resp.raise_for_status()
+def _fetch_firms_data(url: str, retries: int = 3) -> List[Dict]:
+    """Fetch data from FIRMS API, return empty list if only headers exist."""
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            resp = requests.get(url, timeout=(30, 120))
+            resp.raise_for_status()
+            logger.info(
+                "firms_request",
+                extra={"url": url, "status_code": resp.status_code, "retries": attempt - 1},
+            )
+            reader = csv.DictReader(io.StringIO(resp.text))
+            transformed_data = []
+            for row in reader:
+                if not any(row.values()):
+                    continue
+                transformed_data.append(_transform_row(row))
+            return transformed_data
+        except requests.Timeout as e:
+            logger.warning(
+                "firms_timeout",
+                extra={"url": url, "status_code": None, "retries": attempt - 1},
+            )
+            if attempt >= retries:
+                raise HTTPExceptionFactory.gateway_timeout(
+                    f"FIRMS request timeout: {str(e)}. "
+                    "Server is processing large amounts of data, please try again later."
+                )
+        except requests.RequestException as e:
+            status = e.response.status_code if isinstance(e, requests.HTTPError) and e.response else None
+            logger.warning(
+                "firms_error",
+                extra={"url": url, "status_code": status, "retries": attempt - 1},
+            )
+            if isinstance(e, requests.exceptions.HTTPError) and status == 404:
+                return []
+            if attempt >= retries:
+                raise HTTPExceptionFactory.bad_gateway(
+                    f"FIRMS request failed: {str(e)}. "
+                    "If failing repeatedly, try reducing the time span or using coordinate query."
+                )
 
-        reader = csv.DictReader(io.StringIO(resp.text))
-        transformed_data = []
-        for row in reader:
-            if not any(row.values()):
-                continue
-            transformed_data.append(_transform_row(row))
 
-        return transformed_data
-    except requests.Timeout as e:
-        raise HTTPException(
-            504,
-            f"FIRMS request timeout: {str(e)}. "
-            "Server is processing large amounts of data, please try again later."
-        )
-    except requests.RequestException as e:
-        if isinstance(e, requests.exceptions.HTTPError) and e.response.status_code == 404:
-            return []
-        raise HTTPException(
-            502,
-            f"FIRMS request failed: {str(e)}. "
-            "If failing repeatedly, try reducing the time span or using coordinate query."
-        )
-
-
-async def _fetch_firms_data_async(url: str, client: httpx.AsyncClient, source: str) -> List[Dict]:
+async def _fetch_firms_data_async(
+    url: str, client: httpx.AsyncClient, source: str, retries: int = 3
+) -> List[Dict]:
     """异步获取并转换 FIRMS 数据"""
-    try:
-        resp = await client.get(url, timeout=120)
-        resp.raise_for_status()
-
-        reader = csv.DictReader(io.StringIO(resp.text))
-        transformed_data = []
-        for row in reader:
-            if not any(row.values()):
-                continue
-            transformed_data.append(_transform_row(row, source))
-
-        return transformed_data
-    except httpx.TimeoutException as e:
-        raise HTTPException(
-            504,
-            f"FIRMS request timeout: {str(e)}. "
-            "Server is processing large amounts of data, please try again later.",
-        )
-    except httpx.HTTPError as e:
-        if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 404:
-            return []
-        raise HTTPException(
-            502,
-            f"FIRMS request failed: {str(e)}. "
-            "If failing repeatedly, try reducing the time span or using coordinate query.",
-        )
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            resp = await client.get(url, timeout=120)
+            resp.raise_for_status()
+            logger.info(
+                "firms_request",
+                extra={"url": url, "status_code": resp.status_code, "retries": attempt - 1},
+            )
+            reader = csv.DictReader(io.StringIO(resp.text))
+            transformed_data = []
+            for row in reader:
+                if not any(row.values()):
+                    continue
+                transformed_data.append(_transform_row(row, source))
+            return transformed_data
+        except httpx.TimeoutException as e:
+            logger.warning(
+                "firms_timeout",
+                extra={"url": url, "status_code": None, "retries": attempt - 1},
+            )
+            if attempt >= retries:
+                raise HTTPExceptionFactory.gateway_timeout(
+                    f"FIRMS request timeout: {str(e)}. "
+                    "Server is processing large amounts of data, please try again later.",
+                )
+        except httpx.HTTPError as e:
+            status = e.response.status_code if isinstance(e, httpx.HTTPStatusError) and e.response else None
+            logger.warning(
+                "firms_error",
+                extra={"url": url, "status_code": status, "retries": attempt - 1},
+            )
+            if isinstance(e, httpx.HTTPStatusError) and status == 404:
+                return []
+            if attempt >= retries:
+                raise HTTPExceptionFactory.bad_gateway(
+                    f"FIRMS request failed: {str(e)}. "
+                    "If failing repeatedly, try reducing the time span or using coordinate query.",
+                )
 
 
 async def _stream_firms_data_async(
@@ -250,18 +283,20 @@ async def get_fires(
     if country:
         country = country.upper()
         if not validate_country(country):
-            raise HTTPException(400, "Invalid ISO-3 country code")
+            raise HTTPExceptionFactory.bad_request("Invalid ISO-3 country code")
 
     if None not in (west, south, east, north):
         if not _bbox_ok(west, south, east, north):
-            raise HTTPException(400, "Invalid coordinate range")
+            raise HTTPExceptionFactory.bad_request("Invalid coordinate range")
     elif country:
         bbox = country_to_bbox(country)
         if not bbox:
-            raise HTTPException(400, "Invalid ISO-3 country code")
+            raise HTTPExceptionFactory.bad_request("Invalid ISO-3 country code")
         west, south, east, north = bbox
     else:
-        raise HTTPException(400, "Must provide either country code or complete coordinate range")
+        raise HTTPExceptionFactory.bad_request(
+            "Must provide either country code or complete coordinate range"
+        )
 
     # 2) Process dates
     start = _parse_date(start_date)
@@ -270,9 +305,13 @@ async def get_fires(
 
     # Basic date rule checks
     if start > end:
-        raise HTTPException(400, "Start date must not be later than end date")
+        raise HTTPExceptionFactory.bad_request(
+            "Start date must not be later than end date"
+        )
     if end > now:
-        raise HTTPException(400, "End date cannot exceed today")
+        raise HTTPExceptionFactory.bad_request(
+            "End date cannot exceed today"
+        )
 
     # 3) Determine data source based on availability
     priorities = (

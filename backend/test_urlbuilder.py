@@ -1,5 +1,8 @@
 from datetime import date
 
+import pytest
+from pydantic import ValidationError
+
 from utils.urlbuilder import (
     build_country_url,
     build_area_url,
@@ -75,3 +78,23 @@ def test_split_date_range():
         (date(2024, 1, 11), date(2024, 1, 20)),
         (date(2024, 1, 21), date(2024, 1, 25)),
     ]
+
+
+def test_invalid_source():
+    with pytest.raises(ValidationError):
+        build_country_url("K", "BAD", "USA", 1)
+
+
+def test_invalid_country_code():
+    with pytest.raises(ValidationError):
+        build_country_url("K", "MODIS_NRT", "US", 1)
+
+
+def test_invalid_bbox_range():
+    with pytest.raises(ValidationError):
+        build_area_url("K", "MODIS_NRT", (10, 20, -30, 40), 1)
+
+
+def test_invalid_day_range():
+    with pytest.raises(ValidationError):
+        build_area_url("K", "MODIS_NRT", "world", 20)
