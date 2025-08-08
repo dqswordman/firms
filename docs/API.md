@@ -19,3 +19,19 @@
 后端使用 NASA FIRMS v4 CSV 端点：
 - Country：`/api/country/csv/{MAP_KEY}/{SOURCE}/{COUNTRY}/{DAY_RANGE}/{START_DATE}`
 - Area：`/api/area/csv/{MAP_KEY}/{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}`
+
+## URL 拼接规范与样例
+
+### Country
+`https://firms.modaps.eosdis.nasa.gov/api/country/csv/{MAP_KEY}/{SOURCE}/{COUNTRY}/{DAY_RANGE}[/{START_DATE}]`
+
+示例：
+`https://firms.modaps.eosdis.nasa.gov/api/country/csv/KEY/MODIS_NRT/USA/5/2024-01-01`
+
+### Area
+`https://firms.modaps.eosdis.nasa.gov/api/area/csv/{MAP_KEY}/{SOURCE}/{west,south,east,north|world}/{DAY_RANGE}[/{START_DATE}]`
+
+示例：
+`https://firms.modaps.eosdis.nasa.gov/api/area/csv/KEY/MODIS_NRT/world/3`
+
+上述 `{START_DATE}` 可选，未提供时默认为当前日期向前追溯 `{DAY_RANGE}` 天。
