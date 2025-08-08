@@ -95,3 +95,24 @@
 调用 `/fires` 前会通过 `/api/data_availability` 检查各数据集的可用日期范围。
 按 `sourcePriority` 列表依次匹配请求的 `[start_date, end_date]`，优先选择 NRT 数据，当所选日期不在 NRT 范围内时自动回退至对应 SP 数据。
 若所有数据源均不覆盖请求区间，将返回空数组，并在响应头 `X-Data-Availability` 中标明原因。
+
+## 错误码
+
+接口统一返回 `{code, message, details}` 结构的错误信息。常见错误码如下：
+
+| code | 含义 |
+| --- | --- |
+| 400 | 参数错误 |
+| 502 | 下游服务错误 |
+| 503 | 配额或限流 |
+| 504 | 下游超时 |
+
+### 错误示例
+
+```json
+{
+  "code": 400,
+  "message": "Invalid ISO-3 country code",
+  "details": null
+}
+```

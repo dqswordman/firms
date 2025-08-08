@@ -8,6 +8,8 @@
 from datetime import date, timedelta
 from typing import List, Optional, Tuple, Union
 
+from .models import AreaParams, CountryParams
+
 BASE_URL = "https://firms.modaps.eosdis.nasa.gov/api"
 
 
@@ -47,9 +49,12 @@ def build_country_url(
         拼接好的 URL 字符串。
     """
 
-    path = f"/country/csv/{map_key}/{source}/{country}/{day_range}"
-    if start:
-        path += f"/{start.isoformat()}"
+    params = CountryParams(
+        source=source, country=country, dayRange=day_range, start=start
+    )
+    path = f"/country/csv/{map_key}/{params.source.value}/{params.country}/{params.day_range}"
+    if params.start:
+        path += f"/{params.start.isoformat()}"
     return BASE_URL + path
 
 
@@ -73,15 +78,18 @@ def build_area_url(
         拼接好的 URL 字符串。
     """
 
-    if area == "world":
+    params = AreaParams(
+        source=source, area=area, dayRange=day_range, start=start
+    )
+    if params.area == "world":
         area_part = "world"
     else:
-        w, s, e, n = area  # type: ignore[misc]
+        w, s, e, n = params.area  # type: ignore[misc]
         area_part = f"{w},{s},{e},{n}"
 
-    path = f"/area/csv/{map_key}/{source}/{area_part}/{day_range}"
-    if start:
-        path += f"/{start.isoformat()}"
+    path = f"/area/csv/{map_key}/{params.source.value}/{area_part}/{params.day_range}"
+    if params.start:
+        path += f"/{params.start.isoformat()}"
     return BASE_URL + path
 
 
