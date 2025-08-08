@@ -14,6 +14,10 @@
   默认顺序：`VIIRS_NOAA21_NRT,VIIRS_NOAA20_NRT,VIIRS_SNPP_NRT,MODIS_NRT,VIIRS_NOAA21_SP,VIIRS_NOAA20_SP,VIIRS_SNPP_SP,MODIS_SP`。
 - `format`：返回格式，`json` 或 `geojson`，默认为 `json`。
 
+### NDJSON 流式模式
+
+当请求头包含 `Accept: application/x-ndjson` 时，接口会逐条以 NDJSON 格式返回每个 GeoJSON `Feature`，并开启 gzip 压缩。该模式可边解析边下载，适合全球或多天的大结果集场景。
+
 国家列表来源于 NASA FIRMS `/api/countries/`，后端会缓存 24 小时并用于校验 ISO‑3 代码。
 当未提供 `west/south/east/north` 时，可根据合法的 `country` 自动派生外接盒作为兜底。
 
