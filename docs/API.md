@@ -12,6 +12,7 @@
 - `start_date`、`end_date`：日期范围，最大 10 天。
 - `sourcePriority`：逗号分隔的数据源优先级，按顺序选用可用数据集。
   默认顺序：`VIIRS_NOAA21_NRT,VIIRS_NOAA20_NRT,VIIRS_SNPP_NRT,MODIS_NRT,VIIRS_NOAA21_SP,VIIRS_NOAA20_SP,VIIRS_SNPP_SP,MODIS_SP`。
+- `format`：返回格式，`json` 或 `geojson`，默认为 `json`。
 
 国家列表来源于 NASA FIRMS `/api/countries/`，后端会缓存 24 小时并用于校验 ISO‑3 代码。
 当未提供 `west/south/east/north` 时，可根据合法的 `country` 自动派生外接盒作为兜底。
@@ -19,6 +20,55 @@
 后端使用 NASA FIRMS v4 CSV 端点：
 - Country：`/api/country/csv/{MAP_KEY}/{SOURCE}/{COUNTRY}/{DAY_RANGE}/{START_DATE}`
 - Area：`/api/area/csv/{MAP_KEY}/{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}`
+
+### 返回示例
+
+#### JSON
+
+```json
+[
+  {
+    "latitude": "34.56",
+    "longitude": "-120.45",
+    "bright_ti4": "310.5",
+    "acq_date": "2024-03-01",
+    "acq_time": "1300",
+    "confidence": "85",
+    "satellite": "N",
+    "instrument": "VIIRS",
+    "daynight": "D",
+    "source": "VIIRS_SNPP_NRT",
+    "frp": "12.3",
+    "country_id": "USA"
+  }
+]
+```
+
+#### GeoJSON
+
+```json
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [-120.45, 34.56]},
+      "properties": {
+        "brightness": 310.5,
+        "frp": 12.3,
+        "satellite": "N",
+        "instrument": "VIIRS",
+        "daynight": "D",
+        "source": "VIIRS_SNPP_NRT",
+        "country_id": "USA",
+        "confidence": 85,
+        "confidence_text": "85",
+        "acq_datetime": "2024-03-01T13:00:00Z"
+      }
+    }
+  ]
+}
+```
 
 ## URL 拼接规范与样例
 
