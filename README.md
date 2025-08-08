@@ -43,15 +43,18 @@ pip install -r requirements.txt
 ```
 
 4. Configure environment variables:
-Create `.env` file and add your FIRMS API key:
+Create `.env` file and add your FIRMS MAP key:
 ```
-FIRMS_API_KEY=your_api_key_here
+FIRMS_MAP_KEY=your_map_key_here
 ```
+If `FIRMS_MAP_KEY` is not set, the application will fallback to the deprecated `FIRMS_API_KEY` and print a warning.
 
 5. Start server:
 ```bash
 uvicorn main:app --reload
 ```
+
+The backend now uses NASA FIRMS API v4 endpoints and supports a `source` query parameter (default `VIIRS_SNPP_NRT`).
 
 ### Start Frontend
 1. Navigate to frontend directory:

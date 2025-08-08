@@ -23,7 +23,23 @@ app.add_middleware(
 )
 
 # NASA FIRMS API configuration
-MAP_KEY = os.getenv("FIRMS_API_KEY", "5d12184bae5da99a286386dd6e04de14")
+MAP_KEY = os.getenv("FIRMS_MAP_KEY")
+if not MAP_KEY:
+    MAP_KEY = os.getenv("FIRMS_API_KEY")
+    if MAP_KEY:
+        print("Warning: environment variable FIRMS_API_KEY is deprecated, please use FIRMS_MAP_KEY")
+if not MAP_KEY:
+    MAP_KEY = "5d12184bae5da99a286386dd6e04de14"
+SOURCE_WHITELIST = {
+    "VIIRS_NOAA21_NRT",
+    "VIIRS_NOAA20_NRT",
+    "VIIRS_SNPP_NRT",
+    "VIIRS_NOAA20_SP",
+    "VIIRS_SNPP_SP",
+    "MODIS_NRT",
+    "MODIS_SP",
+    "LANDSAT_NRT",
+}
 ISO3_RE = re.compile(r"^[A-Z]{3}$")
 
 # ---------- Utility Functions ----------
@@ -37,11 +53,6 @@ def _parse_date(d: Optional[str]) -> datetime.date:
 
 def _bbox_ok(w,s,e,n):
     return -180<=w<e<=180 and -90<=s<n<=90
-
-def _pick_source(start: datetime.date) -> str:
-    """Use SP dataset if >7 days old, otherwise use NRT"""
-    days_old = (datetime.utcnow().date() - start).days
-    return "VIIRS_SNPP_SP" if days_old > 7 else "VIIRS_SNPP_NRT"
 
 def _fetch_firms_data(url: str) -> List[Dict]:
     """Fetch data from FIRMS API, return empty list if only headers exist"""
@@ -60,9 +71,6 @@ def _fetch_firms_data(url: str) -> List[Dict]:
         # Transform data to match frontend expected format
         transformed_data = []
         for row in data:
-            # Print raw row data to debug field names
-            print(f"Raw row data: {row}")
-            
             transformed_row = {}
             
             # Map common field name variations
@@ -125,8 +133,11 @@ async def health_check():
 async def debug_endpoint():
     """Debug endpoint to check raw response from FIRMS API"""
     try:
-        # Use a known good request to USA for a short date range
-        url = f"https://firms.modaps.eosdis.nasa.gov/api/country/csv/{MAP_KEY}/USA/1/2023-07-01"
+        # Use a known good request to USA for a short date range using v4 endpoint
+        url = (
+            "https://firms.modaps.eosdis.nasa.gov/api/country/csv/"
+            f"{MAP_KEY}/VIIRS_SNPP_NRT/USA/1/2023-07-01"
+        )
         session = requests.Session()
         session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
         resp = session.get(url, timeout=(30, 120))
@@ -155,6 +166,7 @@ def get_fires(
     north: Optional[float] = None,
     start_date: Optional[str] = None,
     end_date:   Optional[str] = None,
+    source: str = Query("VIIRS_SNPP_NRT"),
 ):
     # 1) Determine query mode
     if country:
@@ -181,47 +193,27 @@ def get_fires(
     if (end - start).days > 9:  # Maximum span is 10 days (inclusive)
         raise HTTPException(400, "Time span cannot exceed 10 days")
 
-    # 3) Construct FIRMS URL
-    fmt = "csv"             # Official /country /area endpoints only support csv
-    
-    # Build query parameters
-    day_range = (end - start).days + 1
-    
-    if mode == "country":
-        base = f"https://firms.modaps.eosdis.nasa.gov/api/{mode}/{fmt}/{MAP_KEY}"
-        query_params = f"/{country.upper()}/{day_range}/{start.isoformat()}"
-    else:  # bbox mode
-        base = f"https://firms.modaps.eosdis.nasa.gov/api/area/{fmt}/{MAP_KEY}"
-        # According to official format: .../{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}
-        # No need to assemble the bbox; parameters are placed in order
-        query_params = ""  # In bbox mode, add data source and parameters directly in the URL
+    # 3) Validate source parameter
+    if source not in SOURCE_WHITELIST:
+        raise HTTPException(400, "Invalid source dataset")
 
-    # 4) Try NRT data first
+    # 4) Construct FIRMS v4 URL
+    fmt = "csv"
+    day_range = (end - start).days + 1
+
     if mode == "country":
-        nrt_url = f"{base}/VIIRS_SNPP_NRT{query_params}"
-    else:  # bbox mode
-        # For bbox mode, construct the full URL directly per official spec
-        nrt_url = f"{base}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
-        
-    print(f"DEBUG - NRT URL: {nrt_url}")  # Debug print URL
-    nrt_data = _fetch_firms_data(nrt_url)
-    
-    # If NRT has data, return directly
-    if nrt_data:
-        return nrt_data
-    
-    # 5) If no NRT data, try SP data
-    if mode == "country":
-        sp_url = f"{base}/VIIRS_SNPP_SP{query_params}"
-    else:  # bbox mode
-        # For bbox mode, construct the full URL directly per official spec
-        sp_url = f"{base}/VIIRS_SNPP_SP/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
-        
-    print(f"DEBUG - SP URL: {sp_url}")  # Debug print URL
-    sp_data = _fetch_firms_data(sp_url)
-    
-    # If no SP data either, return empty array
-    return sp_data 
+        url = (
+            f"https://firms.modaps.eosdis.nasa.gov/api/country/{fmt}/"
+            f"{MAP_KEY}/{source}/{country.upper()}/{day_range}/{start.isoformat()}"
+        )
+    else:
+        url = (
+            f"https://firms.modaps.eosdis.nasa.gov/api/area/{fmt}/"
+            f"{MAP_KEY}/{source}/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
+        )
+
+    print(f"FIRMS request URL: {url}")
+    return _fetch_firms_data(url)
 
 @app.get("/cors-test")
 async def cors_test():
@@ -250,9 +242,8 @@ async def debug_bbox_endpoint():
         
         # Build API URL - use 'area' instead of 'bbox' endpoint
         base_url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{MAP_KEY}"
-        
-        # Construct the URL according to official specs
-        # .../{SOURCE}/{west,south,east,north}/{DAY_RANGE}/{START_DATE}
+
+        # Construct the URL according to v4 specs
         nrt_url = f"{base_url}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/{day_range}/{start_date}"
         sp_url = f"{base_url}/VIIRS_SNPP_SP/{west},{south},{east},{north}/{day_range}/{start_date}"
         
