@@ -4,11 +4,12 @@ import io
 import requests
 from datetime import datetime
 from typing import Optional, List, Dict
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from services.geo import validate_country, country_to_bbox
+from utils.data_availability import check_data_availability
 
 # Configure CORS
 load_dotenv()
@@ -40,6 +41,17 @@ SOURCE_WHITELIST = {
     "MODIS_SP",
     "LANDSAT_NRT",
 }
+
+DEFAULT_SOURCE_PRIORITY = [
+    "VIIRS_NOAA21_NRT",
+    "VIIRS_NOAA20_NRT",
+    "VIIRS_SNPP_NRT",
+    "MODIS_NRT",
+    "VIIRS_NOAA21_SP",
+    "VIIRS_NOAA20_SP",
+    "VIIRS_SNPP_SP",
+    "MODIS_SP",
+]
 
 # ---------- Utility Functions ----------
 def _parse_date(d: Optional[str]) -> datetime.date:
@@ -158,6 +170,7 @@ async def debug_endpoint():
 
 @app.get("/fires", response_model=List[Dict])
 def get_fires(
+    response: Response,
     country: Optional[str] = Query(None),
     west: Optional[float] = None,
     south: Optional[float] = None,
@@ -165,7 +178,9 @@ def get_fires(
     north: Optional[float] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    source: str = Query("VIIRS_SNPP_NRT"),
+    source_priority: Optional[str] = Query(
+        None, alias="sourcePriority"
+    ),
 ):
     # 1) Validate and prepare query region
     if country:
@@ -197,16 +212,37 @@ def get_fires(
     if (end - start).days > 9:  # Maximum span is 10 days (inclusive)
         raise HTTPException(400, "Time span cannot exceed 10 days")
 
-    # 3) Validate source parameter
-    if source not in SOURCE_WHITELIST:
-        raise HTTPException(400, "Invalid source dataset")
+    # 3) Determine data source based on availability
+    priorities = (
+        [s.strip().upper() for s in source_priority.split(",")]
+        if source_priority
+        else DEFAULT_SOURCE_PRIORITY
+    )
+    availability = check_data_availability(MAP_KEY, "ALL")
+    selected_source = None
+    for src in priorities:
+        if src not in SOURCE_WHITELIST:
+            continue
+        if src not in availability:
+            continue
+        min_d, max_d = availability[src]
+        min_d = datetime.strptime(min_d, "%Y-%m-%d").date()
+        max_d = datetime.strptime(max_d, "%Y-%m-%d").date()
+        if min_d <= start and end <= max_d:
+            selected_source = src
+            break
+    if not selected_source:
+        response.headers[
+            "X-Data-Availability"
+        ] = "No data available for requested date range"
+        return []
 
     # 4) Construct FIRMS v4 URL using area query
     fmt = "csv"
     day_range = (end - start).days + 1
     url = (
         f"https://firms.modaps.eosdis.nasa.gov/api/area/{fmt}/"
-        f"{MAP_KEY}/{source}/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
+        f"{MAP_KEY}/{selected_source}/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
     )
 
     print(f"FIRMS request URL: {url}")
