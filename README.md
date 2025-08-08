@@ -93,10 +93,19 @@ Now you can access the application at http://localhost:3000 in your browser.
    - Radar Chart: Toggle to show/hide FRP and day/night distribution
 
 4. Data Display:
-   - Map shows wildfire locations with heatmap and clustering
-   - Click on points to view detailed information
-   - Support map zoom and pan
-   - Multiple visualization layers for comprehensive analysis
+ - Map shows wildfire locations with heatmap and clustering
+  - Click on points to view detailed information
+  - Support map zoom and pan
+  - Multiple visualization layers for comprehensive analysis
+
+## 前端数据获取策略
+
+前端采用 TanStack Query 统一管理火点数据请求：
+
+- 以 `(mode, source, country|bbox, startDate, endDate, format)` 作为缓存键；
+- 时间滑块切换日期时，会自动预取相邻的前后一天数据，提高快速切换体验；
+- 请求失败时使用指数退避策略重试，最终失败会弹出 Toast 提示；
+- 可通过 React Query Devtools 查看缓存命中情况。
 
 ## Changelog
 

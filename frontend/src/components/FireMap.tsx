@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import FireHeatmap from './FireHeatmap';
@@ -8,49 +8,21 @@ import FireTrendChart from './FireTrendChart';
 import FireRadarChart from './FireRadarChart';
 import SearchForm from './SearchForm';
 import TimeSlider from './TimeSlider';
-import { FirePoint } from '../types';
+import { FirePoint, SearchParams } from '../types';
 
 interface FireMapProps {
   firePoints: FirePoint[];
   onSearch: (params: any) => void;
+  dates: string[];
+  currentDate: string;
+  onDateChange: (date: string) => void;
+  searchParams: SearchParams | null;
 }
 
-const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch }) => {
-  const [filteredPoints, setFilteredPoints] = useState<FirePoint[]>([]);
-  const [dates, setDates] = useState<string[]>([]);
-  const [currentDate, setCurrentDate] = useState<string>('');
+const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch, dates, currentDate, onDateChange, searchParams }) => {
   const [showStats, setShowStats] = useState(false);
   const [showTrends, setShowTrends] = useState(false);
   const [showRadar, setShowRadar] = useState(false);
-
-  // Extract and sort unique dates
-  useEffect(() => {
-    if (firePoints.length > 0) {
-      const uniqueDates = Array.from(new Set(firePoints.map(point => point.acq_date)))
-        .sort();
-      setDates(uniqueDates);
-      if (uniqueDates.length > 0 && !currentDate) {
-        setCurrentDate(uniqueDates[0]);
-      }
-    } else {
-      setDates([]);
-      setCurrentDate('');
-    }
-  }, [firePoints, currentDate]);
-
-  // Filter points by current date
-  useEffect(() => {
-    if (currentDate && firePoints.length > 0) {
-      const filtered = firePoints.filter(point => point.acq_date === currentDate);
-      setFilteredPoints(filtered);
-    } else {
-      setFilteredPoints([]);
-    }
-  }, [currentDate, firePoints]);
-
-  const handleTimeChange = (date: string) => {
-    setCurrentDate(date);
-  };
 
   const renderVisualizationControls = () => (
     <div className="absolute top-4 right-4 z-[1000] bg-white p-4 rounded-lg shadow-lg">
@@ -101,24 +73,24 @@ const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch }) => {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
-      {filteredPoints.length > 0 && (
+      {firePoints.length > 0 && (
         <>
-          <FireHeatmap firePoints={filteredPoints} />
-          <FireCluster firePoints={filteredPoints} />
+          <FireHeatmap firePoints={firePoints} />
+          <FireCluster firePoints={firePoints} />
         </>
       )}
     </MapContainer>
   );
 
   const renderCharts = () => {
-    if (filteredPoints.length === 0) return null;
+    if (firePoints.length === 0) return null;
 
     return (
       <div className="absolute bottom-20 left-4 right-4 z-[1000] space-y-4">
         {showStats && (
           <div key="stats">
             <FireStatsPanel
-              firePoints={filteredPoints}
+              firePoints={firePoints}
               currentDate={currentDate}
             />
           </div>
@@ -134,7 +106,7 @@ const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch }) => {
         )}
         {showRadar && (
           <div key="radar">
-            <FireRadarChart firePoints={filteredPoints} />
+            <FireRadarChart firePoints={firePoints} />
           </div>
         )}
       </div>
@@ -155,11 +127,12 @@ const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch }) => {
       {renderMap()}
 
       {/* Time Slider */}
-      {firePoints.length > 0 && dates.length > 0 && (
+      {firePoints.length > 0 && dates.length > 0 && searchParams && (
         <TimeSlider
           dates={dates}
           currentDate={currentDate}
-          onTimeChange={handleTimeChange}
+          onTimeChange={onDateChange}
+          params={searchParams}
         />
       )}
 
@@ -169,4 +142,4 @@ const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch }) => {
   );
 };
 
-export default FireMap; 
+export default FireMap;
