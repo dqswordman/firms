@@ -15,6 +15,7 @@ from requests.adapters import HTTPAdapter
 from services.geo import validate_country, country_to_bbox
 from utils.data_availability import check_data_availability
 from utils.urlbuilder import compose_urls
+from utils.geojson import to_geojson
 
 # Configure CORS
 load_dotenv()
@@ -104,6 +105,7 @@ def _fetch_firms_data(url: str) -> List[Dict]:
                 'satellite': ['satellite', 'satellite_name'],
                 'instrument': ['instrument', 'instrument_name'],
                 'daynight': ['daynight', 'day_night'],
+                'country_id': ['country_id', 'country'],
             }
             
             # Apply field mappings
@@ -165,6 +167,7 @@ async def _fetch_firms_data_async(url: str, client: httpx.AsyncClient, source: s
                 "satellite": ["satellite", "satellite_name"],
                 "instrument": ["instrument", "instrument_name"],
                 "daynight": ["daynight", "day_night"],
+                "country_id": ["country_id", "country"],
             }
 
             for target_field, source_fields in field_mappings.items():
@@ -240,7 +243,7 @@ async def debug_endpoint():
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/fires", response_model=List[Dict])
+@app.get("/fires")
 async def get_fires(
     response: Response,
     country: Optional[str] = Query(None),
@@ -253,6 +256,7 @@ async def get_fires(
     source_priority: Optional[str] = Query(
         None, alias="sourcePriority"
     ),
+    format: str = Query("json", regex="^(json|geojson)$"),
 ):
     # 1) Validate and prepare query region
     if country:
@@ -344,6 +348,8 @@ async def get_fires(
             seen.add(key)
             deduped.append(row)
 
+    if format == "geojson":
+        return to_geojson(deduped)
     return deduped
 
 @app.get("/cors-test")
