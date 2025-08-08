@@ -1,15 +1,20 @@
 import os
 import csv
 import io
-import requests
+import asyncio
 from datetime import datetime
 from typing import Optional, List, Dict
+
+import httpx
+import requests
 from fastapi import FastAPI, Query, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
+
 from services.geo import validate_country, country_to_bbox
 from utils.data_availability import check_data_availability
+from utils.urlbuilder import compose_urls
 
 # Configure CORS
 load_dotenv()
@@ -52,6 +57,8 @@ DEFAULT_SOURCE_PRIORITY = [
     "VIIRS_SNPP_SP",
     "MODIS_SP",
 ]
+
+MAX_CONCURRENT_REQUESTS = 5
 
 # ---------- Utility Functions ----------
 def _parse_date(d: Optional[str]) -> datetime.date:
@@ -131,6 +138,71 @@ def _fetch_firms_data(url: str) -> List[Dict]:
             "If failing repeatedly, try reducing the time span or using coordinate query."
         )
 
+
+async def _fetch_firms_data_async(url: str, client: httpx.AsyncClient, source: str) -> List[Dict]:
+    """异步获取并转换 FIRMS 数据"""
+    try:
+        resp = await client.get(url, timeout=120)
+        resp.raise_for_status()
+
+        data = list(csv.DictReader(io.StringIO(resp.text)))
+        if len(data) == 1 and all(not v for v in data[0].values()):
+            return []
+
+        transformed_data = []
+        for row in data:
+            transformed_row = {"source": source}
+
+            field_mappings = {
+                "latitude": ["latitude", "lat"],
+                "longitude": ["longitude", "lon", "long"],
+                "bright_ti4": ["bright_ti4", "brightness", "bright_t31"],
+                "bright_ti5": ["bright_ti5", "bright_t21", "bright_t22"],
+                "frp": ["frp", "fire_radiative_power"],
+                "acq_date": ["acq_date", "acquisition_date", "date"],
+                "acq_time": ["acq_time", "acquisition_time", "time"],
+                "confidence": ["confidence", "conf"],
+                "satellite": ["satellite", "satellite_name"],
+                "instrument": ["instrument", "instrument_name"],
+                "daynight": ["daynight", "day_night"],
+            }
+
+            for target_field, source_fields in field_mappings.items():
+                for src_field in source_fields:
+                    for key in row.keys():
+                        if key.lower() == src_field.lower():
+                            transformed_row[target_field] = row[key]
+                            break
+
+            required_fields = [
+                "latitude",
+                "longitude",
+                "bright_ti4",
+                "acq_date",
+                "acq_time",
+            ]
+            for field in required_fields:
+                if field not in transformed_row:
+                    transformed_row[field] = ""
+
+            transformed_data.append(transformed_row)
+
+        return transformed_data
+    except httpx.TimeoutException as e:
+        raise HTTPException(
+            504,
+            f"FIRMS request timeout: {str(e)}. "
+            "Server is processing large amounts of data, please try again later.",
+        )
+    except httpx.HTTPError as e:
+        if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 404:
+            return []
+        raise HTTPException(
+            502,
+            f"FIRMS request failed: {str(e)}. "
+            "If failing repeatedly, try reducing the time span or using coordinate query.",
+        )
+
 # ---------- Core Routes ----------
 @app.get("/")
 async def root():
@@ -169,7 +241,7 @@ async def debug_endpoint():
         return {"error": str(e)}
 
 @app.get("/fires", response_model=List[Dict])
-def get_fires(
+async def get_fires(
     response: Response,
     country: Optional[str] = Query(None),
     west: Optional[float] = None,
@@ -209,8 +281,6 @@ def get_fires(
         raise HTTPException(400, "Start date must not be later than end date")
     if end > now:
         raise HTTPException(400, "End date cannot exceed today")
-    if (end - start).days > 9:  # Maximum span is 10 days (inclusive)
-        raise HTTPException(400, "Time span cannot exceed 10 days")
 
     # 3) Determine data source based on availability
     priorities = (
@@ -237,16 +307,44 @@ def get_fires(
         ] = "No data available for requested date range"
         return []
 
-    # 4) Construct FIRMS v4 URL using area query
-    fmt = "csv"
-    day_range = (end - start).days + 1
-    url = (
-        f"https://firms.modaps.eosdis.nasa.gov/api/area/{fmt}/"
-        f"{MAP_KEY}/{selected_source}/{west},{south},{east},{north}/{day_range}/{start.isoformat()}"
+    # 4) Generate URLs for the full date range and fetch concurrently
+    urls = compose_urls(
+        MAP_KEY,
+        selected_source,
+        start,
+        end,
+        area=(west, south, east, north),
     )
 
-    print(f"FIRMS request URL: {url}")
-    return _fetch_firms_data(url)
+    async with httpx.AsyncClient() as client:
+        sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
+        async def fetch(url: str) -> List[Dict]:
+            async with sem:
+                return await _fetch_firms_data_async(url, client, selected_source)
+
+        tasks = [asyncio.create_task(fetch(u)) for u in urls]
+        results = await asyncio.gather(*tasks)
+
+    merged: List[Dict] = []
+    for r in results:
+        merged.extend(r)
+
+    deduped: List[Dict] = []
+    seen = set()
+    for row in merged:
+        key = (
+            row.get("acq_date"),
+            row.get("acq_time"),
+            row.get("latitude"),
+            row.get("longitude"),
+            row.get("source"),
+        )
+        if key not in seen:
+            seen.add(key)
+            deduped.append(row)
+
+    return deduped
 
 @app.get("/cors-test")
 async def cors_test():

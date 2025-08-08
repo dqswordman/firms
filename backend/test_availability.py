@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient
 from main import app
 
 
@@ -23,12 +24,12 @@ def test_fallback_to_sp(monkeypatch):
 
     called = {}
 
-    def fake_fetch(url):
+    async def fake_fetch(url, client, source):
         called["url"] = url
         return result
 
     monkeypatch.setattr("main.check_data_availability", fake_check)
-    monkeypatch.setattr("main._fetch_firms_data", fake_fetch)
+    monkeypatch.setattr("main._fetch_firms_data_async", fake_fetch)
 
     resp = client.get(
         "/fires",
@@ -57,11 +58,11 @@ def test_no_source_available(monkeypatch):
             "VIIRS_SNPP_SP": ("2023-01-01", "2023-12-31"),
         }
 
-    def fake_fetch(url):
+    async def fake_fetch(url, client, source):
         raise AssertionError("should not be called")
 
     monkeypatch.setattr("main.check_data_availability", fake_check)
-    monkeypatch.setattr("main._fetch_firms_data", fake_fetch)
+    monkeypatch.setattr("main._fetch_firms_data_async", fake_fetch)
 
     resp = client.get(
         "/fires",

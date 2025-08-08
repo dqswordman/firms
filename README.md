@@ -7,6 +7,7 @@ A global wildfire data visualization system based on NASA FIRMS API, supporting 
 - Global wildfire data visualization with an interactive map
 - Country or region-based query support
 - Time series data display with a date slider
+- Automatic splitting of date ranges longer than 10 days
 - Detailed wildfire point information
 - Multiple visualization layers:
   - Heatmap (always visible)
@@ -83,7 +84,7 @@ Now you can access the application at http://localhost:3000 in your browser.
 2. Time Selection:
    - Use time slider to select specific date
    - Use forward/backward buttons to navigate adjacent dates
-   - Time span limited to 10 days
+   - Date ranges exceeding 10 days are automatically split into multiple requests
 
 3. Visualization Controls:
    - Heatmap and Clusters are always visible
