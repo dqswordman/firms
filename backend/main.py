@@ -1,14 +1,17 @@
 import os
 import csv
 import io
+import json
 import asyncio
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, AsyncGenerator
 
 import httpx
 import requests
-from fastapi import FastAPI, Query, HTTPException, Response
+from fastapi import FastAPI, Query, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 
@@ -28,6 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # NASA FIRMS API configuration
 MAP_KEY = os.getenv("FIRMS_MAP_KEY")
@@ -73,57 +77,56 @@ def _parse_date(d: Optional[str]) -> datetime.date:
 def _bbox_ok(w,s,e,n):
     return -180<=w<e<=180 and -90<=s<n<=90
 
+
+FIELD_MAPPINGS = {
+    "latitude": ["latitude", "lat"],
+    "longitude": ["longitude", "lon", "long"],
+    "bright_ti4": ["bright_ti4", "brightness", "bright_t31"],
+    "bright_ti5": ["bright_ti5", "bright_t21", "bright_t22"],
+    "frp": ["frp", "fire_radiative_power"],
+    "acq_date": ["acq_date", "acquisition_date", "date"],
+    "acq_time": ["acq_time", "acquisition_time", "time"],
+    "confidence": ["confidence", "conf"],
+    "satellite": ["satellite", "satellite_name"],
+    "instrument": ["instrument", "instrument_name"],
+    "daynight": ["daynight", "day_night"],
+    "country_id": ["country_id", "country"],
+}
+
+
+def _transform_row(row: Dict, source: Optional[str] = None) -> Dict:
+    """Apply field mappings and ensure required fields."""
+    transformed: Dict[str, str] = {}
+    for target, sources in FIELD_MAPPINGS.items():
+        for src in sources:
+            for key in row.keys():
+                if key.lower() == src.lower():
+                    transformed[target] = row[key]
+                    break
+
+    required = ["latitude", "longitude", "bright_ti4", "acq_date", "acq_time"]
+    for field in required:
+        if field not in transformed:
+            transformed[field] = ""
+    if source:
+        transformed["source"] = source
+    return transformed
+
 def _fetch_firms_data(url: str) -> List[Dict]:
     """Fetch data from FIRMS API, return empty list if only headers exist"""
     try:
         session = requests.Session()
         session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
-        resp = session.get(url, timeout=(30, 120))   # 30s connect, 120s read
+        resp = session.get(url, timeout=(30, 120))  # 30s connect, 120s read
         resp.raise_for_status()
-        
-        # Parse CSV data
-        data = list(csv.DictReader(io.StringIO(resp.text)))
-        # If only headers exist (single row with all empty values), return empty list
-        if len(data) == 1 and all(not v for v in data[0].values()):
-            return []
-            
-        # Transform data to match frontend expected format
+
+        reader = csv.DictReader(io.StringIO(resp.text))
         transformed_data = []
-        for row in data:
-            transformed_row = {}
-            
-            # Map common field name variations
-            field_mappings = {
-                'latitude': ['latitude', 'lat'],
-                'longitude': ['longitude', 'lon', 'long'],
-                'bright_ti4': ['bright_ti4', 'brightness', 'bright_t31'],
-                'bright_ti5': ['bright_ti5', 'bright_t21', 'bright_t22'],
-                'frp': ['frp', 'fire_radiative_power'],
-                'acq_date': ['acq_date', 'acquisition_date', 'date'],
-                'acq_time': ['acq_time', 'acquisition_time', 'time'],
-                'confidence': ['confidence', 'conf'],
-                'satellite': ['satellite', 'satellite_name'],
-                'instrument': ['instrument', 'instrument_name'],
-                'daynight': ['daynight', 'day_night'],
-                'country_id': ['country_id', 'country'],
-            }
-            
-            # Apply field mappings
-            for target_field, source_fields in field_mappings.items():
-                for source in source_fields:
-                    for key in row.keys():
-                        if key.lower() == source.lower():
-                            transformed_row[target_field] = row[key]
-                            break
-            
-            # Ensure all required fields exist
-            required_fields = ['latitude', 'longitude', 'bright_ti4', 'acq_date', 'acq_time']
-            for field in required_fields:
-                if field not in transformed_row:
-                    transformed_row[field] = ""
-            
-            transformed_data.append(transformed_row)
-            
+        for row in reader:
+            if not any(row.values()):
+                continue
+            transformed_data.append(_transform_row(row))
+
         return transformed_data
     except requests.Timeout as e:
         raise HTTPException(
@@ -147,48 +150,12 @@ async def _fetch_firms_data_async(url: str, client: httpx.AsyncClient, source: s
         resp = await client.get(url, timeout=120)
         resp.raise_for_status()
 
-        data = list(csv.DictReader(io.StringIO(resp.text)))
-        if len(data) == 1 and all(not v for v in data[0].values()):
-            return []
-
+        reader = csv.DictReader(io.StringIO(resp.text))
         transformed_data = []
-        for row in data:
-            transformed_row = {"source": source}
-
-            field_mappings = {
-                "latitude": ["latitude", "lat"],
-                "longitude": ["longitude", "lon", "long"],
-                "bright_ti4": ["bright_ti4", "brightness", "bright_t31"],
-                "bright_ti5": ["bright_ti5", "bright_t21", "bright_t22"],
-                "frp": ["frp", "fire_radiative_power"],
-                "acq_date": ["acq_date", "acquisition_date", "date"],
-                "acq_time": ["acq_time", "acquisition_time", "time"],
-                "confidence": ["confidence", "conf"],
-                "satellite": ["satellite", "satellite_name"],
-                "instrument": ["instrument", "instrument_name"],
-                "daynight": ["daynight", "day_night"],
-                "country_id": ["country_id", "country"],
-            }
-
-            for target_field, source_fields in field_mappings.items():
-                for src_field in source_fields:
-                    for key in row.keys():
-                        if key.lower() == src_field.lower():
-                            transformed_row[target_field] = row[key]
-                            break
-
-            required_fields = [
-                "latitude",
-                "longitude",
-                "bright_ti4",
-                "acq_date",
-                "acq_time",
-            ]
-            for field in required_fields:
-                if field not in transformed_row:
-                    transformed_row[field] = ""
-
-            transformed_data.append(transformed_row)
+        for row in reader:
+            if not any(row.values()):
+                continue
+            transformed_data.append(_transform_row(row, source))
 
         return transformed_data
     except httpx.TimeoutException as e:
@@ -205,6 +172,26 @@ async def _fetch_firms_data_async(url: str, client: httpx.AsyncClient, source: s
             f"FIRMS request failed: {str(e)}. "
             "If failing repeatedly, try reducing the time span or using coordinate query.",
         )
+
+
+async def _stream_firms_data_async(
+    url: str, client: httpx.AsyncClient, source: str
+) -> AsyncGenerator[Dict, None]:
+    """Stream FIRMS CSV data and yield transformed rows."""
+    async with client.stream("GET", url, timeout=120) as resp:
+        resp.raise_for_status()
+        header: Optional[List[str]] = None
+        async for line in resp.aiter_lines():
+            if not line:
+                continue
+            if header is None:
+                header = next(csv.reader([line]))
+                continue
+            values = next(csv.reader([line]))
+            row = dict(zip(header, values))
+            if not any(row.values()):
+                continue
+            yield _transform_row(row, source)
 
 # ---------- Core Routes ----------
 @app.get("/")
@@ -245,6 +232,7 @@ async def debug_endpoint():
 
 @app.get("/fires")
 async def get_fires(
+    request: Request,
     response: Response,
     country: Optional[str] = Query(None),
     west: Optional[float] = None,
@@ -319,6 +307,29 @@ async def get_fires(
         end,
         area=(west, south, east, north),
     )
+
+    if "application/x-ndjson" in request.headers.get("accept", ""):
+        async def ndjson_stream() -> AsyncGenerator[bytes, None]:
+            seen = set()
+            async with httpx.AsyncClient() as client:
+                for url in urls:
+                    async for row in _stream_firms_data_async(
+                        url, client, selected_source
+                    ):
+                        key = (
+                            row.get("acq_date"),
+                            row.get("acq_time"),
+                            row.get("latitude"),
+                            row.get("longitude"),
+                            row.get("source"),
+                        )
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        feature = to_geojson([row])["features"][0]
+                        yield (json.dumps(feature) + "\n").encode("utf-8")
+
+        return StreamingResponse(ndjson_stream(), media_type="application/x-ndjson")
 
     async with httpx.AsyncClient() as client:
         sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
