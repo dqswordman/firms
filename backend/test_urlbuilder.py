@@ -1,6 +1,11 @@
 from datetime import date
 
-from utils.urlbuilder import build_country_url, build_area_url, compose_urls
+from utils.urlbuilder import (
+    build_country_url,
+    build_area_url,
+    compose_urls,
+    split_date_range,
+)
 
 
 def test_build_country_url_with_and_without_date():
@@ -60,4 +65,13 @@ def test_compose_urls_cross_month_and_year():
     assert urls == [
         "https://firms.modaps.eosdis.nasa.gov/api/country/csv/"
         "K/MODIS_NRT/USA/6/2024-01-28"
+    ]
+
+
+def test_split_date_range():
+    ranges = split_date_range(date(2024, 1, 1), date(2024, 1, 25))
+    assert ranges == [
+        (date(2024, 1, 1), date(2024, 1, 10)),
+        (date(2024, 1, 11), date(2024, 1, 20)),
+        (date(2024, 1, 21), date(2024, 1, 25)),
     ]

@@ -11,6 +11,22 @@ from typing import List, Optional, Tuple, Union
 BASE_URL = "https://firms.modaps.eosdis.nasa.gov/api"
 
 
+def split_date_range(start: date, end: date, max_span: int = 10) -> List[Tuple[date, date]]:
+    """将日期区间拆分为不超过 ``max_span`` 天的多段区间。"""
+    if start > end:
+        raise ValueError("start must not be after end")
+    if max_span < 1:
+        raise ValueError("max_span must be >= 1")
+
+    ranges: List[Tuple[date, date]] = []
+    cur = start
+    while cur <= end:
+        seg_end = min(cur + timedelta(days=max_span - 1), end)
+        ranges.append((cur, seg_end))
+        cur = seg_end + timedelta(days=1)
+    return ranges
+
+
 def build_country_url(
     map_key: str,
     source: str,
@@ -97,15 +113,18 @@ def compose_urls(
         raise ValueError("provide exactly one of country or area")
 
     urls: List[str] = []
-    cur = start
-    while cur <= end:
-        segment_end = min(cur + timedelta(days=9), end)
-        day_range = (segment_end - cur).days + 1
+    for seg_start, seg_end in split_date_range(start, end):
+        day_range = (seg_end - seg_start).days + 1
         if country:
-            url = build_country_url(map_key, source, country, day_range, cur)
+            url = build_country_url(map_key, source, country, day_range, seg_start)
         else:
-            url = build_area_url(map_key, source, area, day_range, cur)  # type: ignore[arg-type]
+            url = build_area_url(
+                map_key,
+                source,
+                area,
+                day_range,
+                seg_start,
+            )  # type: ignore[arg-type]
         urls.append(url)
-        cur = segment_end + timedelta(days=1)
 
     return urls
