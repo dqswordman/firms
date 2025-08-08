@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import FireHeatmap from './FireHeatmap';
@@ -8,10 +8,10 @@ import FireTrendChart from './FireTrendChart';
 import FireRadarChart from './FireRadarChart';
 import SearchForm from './SearchForm';
 import TimeSlider from './TimeSlider';
-import { FirePoint, SearchParams } from '../types';
+import { FireFeatureCollection, FirePoint, SearchParams } from '../types';
 
 interface FireMapProps {
-  firePoints: FirePoint[];
+  fireCollection: FireFeatureCollection;
   onSearch: (params: any) => void;
   dates: string[];
   currentDate: string;
@@ -19,18 +19,68 @@ interface FireMapProps {
   searchParams: SearchParams | null;
 }
 
-const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch, dates, currentDate, onDateChange, searchParams }) => {
+const FireMap: React.FC<FireMapProps> = ({ fireCollection, onSearch, dates, currentDate, onDateChange, searchParams }) => {
+  const firePoints = useMemo(() => fireCollection.features.map(f => f.properties as FirePoint), [fireCollection]);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+  const [showCluster, setShowCluster] = useState(true);
   const [showStats, setShowStats] = useState(false);
   const [showTrends, setShowTrends] = useState(false);
   const [showRadar, setShowRadar] = useState(false);
+  const [weightBy, setWeightBy] = useState<'frp' | 'brightness'>('frp');
+  const [threshold, setThreshold] = useState(0);
+  const maxWeight = useMemo(() => {
+    const values = firePoints.map(p => parseFloat(weightBy === 'frp' ? p.frp || '0' : p.bright_ti4 || '0')).filter(v => !isNaN(v));
+    return values.length > 0 ? Math.max(...values) : 0;
+  }, [firePoints, weightBy]);
 
   const renderVisualizationControls = () => (
     <div className="absolute top-4 right-4 z-[1000] bg-white p-4 rounded-lg shadow-lg">
       <h3 className="font-semibold mb-2">Visualization Controls</h3>
       <div className="space-y-2">
-        <div className="text-sm text-gray-500 mb-2">
-          <p>Heatmap and Clusters are always visible</p>
-        </div>
+        <label className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={showHeatmap}
+            onChange={(e) => setShowHeatmap(e.target.checked)}
+            className="form-checkbox"
+          />
+          <span>Heatmap</span>
+        </label>
+        {showHeatmap && (
+          <div className="ml-4 space-y-2">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm">Weight by:</span>
+              <select
+                value={weightBy}
+                onChange={(e) => setWeightBy(e.target.value as 'frp' | 'brightness')}
+                className="border rounded p-1 text-sm"
+              >
+                <option value="frp">FRP</option>
+                <option value="brightness">Brightness</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm">Threshold: {threshold.toFixed(0)}</label>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(maxWeight, 1)}
+                value={threshold}
+                onChange={(e) => setThreshold(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          </div>
+        )}
+        <label className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={showCluster}
+            onChange={(e) => setShowCluster(e.target.checked)}
+            className="form-checkbox"
+          />
+          <span>Clusters</span>
+        </label>
         <label className="flex items-center space-x-2">
           <input
             type="checkbox"
@@ -73,10 +123,16 @@ const FireMap: React.FC<FireMapProps> = ({ firePoints, onSearch, dates, currentD
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
-      {firePoints.length > 0 && (
+      {fireCollection.features.length > 0 && (
         <>
-          <FireHeatmap firePoints={firePoints} />
-          <FireCluster firePoints={firePoints} />
+          {showHeatmap && (
+            <FireHeatmap
+              fireCollection={fireCollection}
+              weightBy={weightBy}
+              threshold={threshold}
+            />
+          )}
+          {showCluster && <FireCluster fireCollection={fireCollection} />}
         </>
       )}
     </MapContainer>

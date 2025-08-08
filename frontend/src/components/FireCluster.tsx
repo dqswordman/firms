@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import { FirePoint } from '../types';
+import { FireFeatureCollection, FirePoint } from '../types';
 
 // Add type definitions for leaflet.markercluster
 declare module 'leaflet' {
@@ -19,10 +19,10 @@ declare module 'leaflet' {
 }
 
 interface FireClusterProps {
-  firePoints: FirePoint[];
+  fireCollection: FireFeatureCollection;
 }
 
-const FireCluster: React.FC<FireClusterProps> = ({ firePoints }) => {
+const FireCluster: React.FC<FireClusterProps> = ({ fireCollection }) => {
   const map = useMap();
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
 
@@ -100,10 +100,10 @@ const FireCluster: React.FC<FireClusterProps> = ({ firePoints }) => {
     clusterGroup.clearLayers();
 
     // Add new markers
-    firePoints.forEach((point) => {
-      const lat = parseFloat(point.latitude);
-      const lng = parseFloat(point.longitude);
-      
+    fireCollection.features.forEach((feature) => {
+      const [lng, lat] = feature.geometry.coordinates;
+      const point = feature.properties as FirePoint;
+
       if (isNaN(lat) || isNaN(lng)) {
         console.error('Invalid coordinates for point:', point);
         return;
@@ -187,7 +187,7 @@ const FireCluster: React.FC<FireClusterProps> = ({ firePoints }) => {
         clusterGroupRef.current = null;
       }
     };
-  }, [map, firePoints]);
+  }, [map, fireCollection]);
 
   return null;
 };

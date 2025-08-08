@@ -1,3 +1,5 @@
+import { Feature, FeatureCollection, Point } from 'geojson';
+
 export interface FirePoint {
   latitude: string;
   longitude: string;
@@ -16,6 +18,9 @@ export interface FirePoint {
   version?: string;
 }
 
+export type FireFeature = Feature<Point, FirePoint>;
+export type FireFeatureCollection = FeatureCollection<Point, FirePoint>;
+
 export interface SearchParams {
   mode: 'country' | 'bbox';
   country?: string;
@@ -26,5 +31,5 @@ export interface SearchParams {
   startDate: string;
   endDate: string;
   source?: string;
-  format?: string;
+  format?: 'json' | 'geojson';
 }
