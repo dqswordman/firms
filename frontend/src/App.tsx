@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import FireMap from './components/FireMap';
-import { FirePoint, SearchParams } from './types';
+import { SearchParams, FireFeatureCollection } from './types';
 import './App.css';
 import { useFiresQuery } from './hooks/useFiresQuery';
 import { eachDayOfInterval, format } from 'date-fns';
@@ -14,7 +14,7 @@ const App: React.FC = () => {
     ? { ...baseParams, startDate: currentDate, endDate: currentDate }
     : undefined;
   const { data, isLoading, error } = useFiresQuery(queryParams);
-  const firePoints: FirePoint[] = data || [];
+  const fireCollection: FireFeatureCollection = data || { type: 'FeatureCollection', features: [] };
 
   const handleSearch = (params: SearchParams) => {
     setBaseParams(params);
@@ -31,7 +31,7 @@ const App: React.FC = () => {
   return (
     <div className="relative">
       <FireMap
-        firePoints={firePoints}
+        fireCollection={fireCollection}
         onSearch={handleSearch}
         dates={dates}
         currentDate={currentDate || ''}

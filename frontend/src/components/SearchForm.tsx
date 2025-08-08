@@ -14,6 +14,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
   const [north, setNorth] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [format, setFormat] = useState<'geojson' | 'json'>('geojson');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +24,7 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
       startDate,
       endDate,
       source: 'modis',
-      format: 'json',
+      format,
     };
 
     if (mode === 'country') {
@@ -123,11 +124,11 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
               step="any"
             />
           </div>
-        </div>
-      )}
+      </div>
+    )}
 
-      <div className="mb-4">
-        <label className="block mb-2">Date Range:</label>
+    <div className="mb-4">
+      <label className="block mb-2">Date Range:</label>
         <div className="grid grid-cols-2 gap-4">
           <input
             type="date"
@@ -140,9 +141,21 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             className="p-2 border rounded"
-          />
-        </div>
+        />
       </div>
+    </div>
+
+    <div className="mb-4">
+      <label className="block mb-2">Data Format:</label>
+      <select
+        value={format}
+        onChange={(e) => setFormat(e.target.value as 'geojson' | 'json')}
+        className="w-full p-2 border rounded"
+      >
+        <option value="geojson">GeoJSON</option>
+        <option value="json">JSON (legacy)</option>
+      </select>
+    </div>
 
       <button
         type="submit"

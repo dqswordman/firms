@@ -1,6 +1,6 @@
 import { useQuery, QueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
-import { SearchParams, FirePoint } from '../types';
+import { SearchParams, FirePoint, FireFeatureCollection, FireFeature } from '../types';
 
 export interface FireQueryParams extends SearchParams {}
 
@@ -13,10 +13,10 @@ export const firesQueryKey = (params: FireQueryParams) => [
     : `${params.west},${params.south},${params.east},${params.north}`,
   params.startDate,
   params.endDate,
-  params.format || 'json',
+  params.format || 'geojson',
 ];
 
-const fetchFires = async (params: FireQueryParams) => {
+const fetchFires = async (params: FireQueryParams): Promise<FireFeatureCollection> => {
   const queryParams = new URLSearchParams();
   if (params.mode === 'country') {
     queryParams.append('country', params.country!);
@@ -36,11 +36,24 @@ const fetchFires = async (params: FireQueryParams) => {
   if (!res.ok) {
     throw new Error('Failed to fetch fire data');
   }
-  return res.json() as Promise<FirePoint[]>;
+  const data = await res.json();
+  if (params.format === 'geojson') {
+    return data as FireFeatureCollection;
+  }
+  const points = data as FirePoint[];
+  const features: FireFeature[] = points.map(point => ({
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: [parseFloat(point.longitude), parseFloat(point.latitude)],
+    },
+    properties: point,
+  }));
+  return { type: 'FeatureCollection', features };
 };
 
 export const useFiresQuery = (params: FireQueryParams | undefined) => {
-  return useQuery<FirePoint[]>({
+  return useQuery<FireFeatureCollection>({
     queryKey: params ? firesQueryKey(params) : [],
     queryFn: () => fetchFires(params as FireQueryParams),
     enabled: !!params,
