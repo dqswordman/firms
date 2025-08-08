@@ -1,15 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { enUS } from 'date-fns/locale';
+import { SearchParams } from '../types';
+import { useQueryClient } from '@tanstack/react-query';
+import { prefetchFires } from '../hooks/useFiresQuery';
 
 interface TimeSliderProps {
   dates: string[];
   currentDate: string;
   onTimeChange: (date: string) => void;
+  params: SearchParams;
 }
 
-const TimeSlider: React.FC<TimeSliderProps> = ({ dates, currentDate, onTimeChange }) => {
+const TimeSlider: React.FC<TimeSliderProps> = ({ dates, currentDate, onTimeChange, params }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const queryClient = useQueryClient();
+
+  // Prefetch adjacent dates to improve slider performance
+  useEffect(() => {
+    if (dates.length === 0 || !currentDate) return;
+    const index = dates.indexOf(currentDate);
+    const prevDate = dates[index - 1];
+    const nextDate = dates[index + 1];
+    if (prevDate) {
+      prefetchFires(queryClient, {
+        ...params,
+        startDate: prevDate,
+        endDate: prevDate,
+      });
+    }
+    if (nextDate) {
+      prefetchFires(queryClient, {
+        ...params,
+        startDate: nextDate,
+        endDate: nextDate,
+      });
+    }
+  }, [currentDate, dates, params, queryClient]);
 
   // Update slider position when the date list or current date changes
   useEffect(() => {

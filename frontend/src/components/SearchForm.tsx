@@ -1,18 +1,8 @@
 import React, { useState } from 'react';
+import { SearchParams } from '../types';
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
-}
-
-export interface SearchParams {
-  mode: 'country' | 'bbox';
-  country?: string;
-  west?: number;
-  south?: number;
-  east?: number;
-  north?: number;
-  startDate: string;
-  endDate: string;
 }
 
 const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
@@ -32,6 +22,8 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
       mode,
       startDate,
       endDate,
+      source: 'modis',
+      format: 'json',
     };
 
     if (mode === 'country') {
@@ -162,4 +154,4 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
   );
 };
 
-export default SearchForm; 
+export default SearchForm;

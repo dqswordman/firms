@@ -25,4 +25,6 @@ export interface SearchParams {
   north?: number;
   startDate: string;
   endDate: string;
-} 
+  source?: string;
+  format?: string;
+}
