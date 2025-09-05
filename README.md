@@ -1,4 +1,4 @@
-# FIRMS Wildfire Data Visualization System
+﻿# FIRMS Wildfire Data Visualization System
 
 A global wildfire data visualization system based on NASA FIRMS API, supporting country/bbox queries and time series visualization.
 
@@ -50,48 +50,32 @@ REACT_APP_API_URL=http://localhost:8000
   - Fires section includes optional Filter (FRP/Brightness) applied to map layers
 - Bottom: Time slider with quick ranges (Today / 24H / 48H / 7D / WEEK)
   - Shows month ticks and highlights the current date
-  - Toolbar actions: Measure（距离/面积测量：点击加点，双击结束；支持单位切换 / 清空 / Pan 暂停）、Help（打开帮助对话框）
-  - Note: The Location action has been removed
+  - Toolbar actions: Measure (distance/area) and Help
+- Note: The Location action has been removed
 - Note: Legend panel is temporarily removed to avoid dropdown overlap (Trend/Radar, Select poppers)
 
 ## Usage Guide
 
-1) Query
-   - Country: ISO3 (e.g., CHN)
-   - BBox: lat/lon min/max
-2) Time selection
-   - Use time slider to pick the day; quick-range buttons adjust range
-3) Visualization controls
-   - Heatmap, Clusters, Overlays toggles; Analytics tabs in the right panel
-4) Map interactions
-   - Pan/zoom the map; click clusters or points for details
+## Frontend Data Fetching Strategy
 
-## 前端数据获取策略
+- Use TanStack Query to manage wildfire data requests
+- Cache key: (mode, source, country|bbox, startDate, endDate, format)
+- Fetch once for the selected date range; filter by acq_date locally via the time slider
+- Use exponential backoff on failures; inspect cache with React Query Devtools
 
-- 使用 TanStack Query 统一管理火点数据请求
-- 以 `(mode, source, country|bbox, startDate, endDate, format)` 作为缓存键
-- 在选定日期区间内仅请求一次；时间滑块切换按 `acq_date` 本地过滤
-- 失败采用指数退避策略并弹出提示；可用 React Query Devtools 观察缓存命中
-
-## Measure 功能说明（对齐 NASA 体验）
-
-- 模式：Distance / Area
-- 单位：距离 km / mi / m；面积 km² / mi² / ha（可切换）
-- 交互：点击加点，双击结束；ESC 取消当前绘制；Clear 清空；Pan 暂停绘制以便拖动地图
-- 显示：
-  - 距离：分段里程标注（每段中点），末端显示 Total
-  - 面积：闭合多边形后在中心显示 Area（未闭合不计算）
-- UI：开启后左下显示“MEASURE TOOL”卡片（模式、单位、Pan、Clear）
-
-实现位置：`frontend/src/components/FireMap.tsx`（MeasureLayerPro）
+## Measure (Overview)
+- Modes: Distance / Area
+- Units: km / mi / m; km² / mi² / ha
+- Interaction: click to add points; double-click to finish; ESC cancels; Clear removes all; Pan pauses drawing to pan the map
+- Display:
+  - Distance: per-segment labels (midpoints) and Total at the end
+  - Area: when polygon has 3+ points, Area shown near center
+- UI: a "MEASURE TOOL" card shows Mode, Units, Pan, Clear
+Implementation: frontend/src/components/FireMap.tsx (MeasureLayerPro)
 
 ## Changelog
 
 Latest changes are recorded in `UPDATE.md`.
-
-### July 2, 2025
-- Frontend: fixed TypeScript optional fields handling; improved error handling in charts
-- Backend: align area queries with FIRMS v4; improved validation; debugging endpoints removed later
 
 ## Technology Stack
 
@@ -109,7 +93,7 @@ Latest changes are recorded in `UPDATE.md`.
 
 - 503 Service Unavailable: ensure `FIRMS_MAP_KEY` exists and restart backend
 - 400 Bad Request: check ISO3/bbox; date span <= 10 days; end date <= today
-- 429 Too Many Requests: FIRMS quota exceeded — wait or reduce request size
+- 429 Too Many Requests: FIRMS quota exceeded; wait or reduce request size
 - CORS blocked: include frontend origin in `ALLOWED_ORIGINS`
 
 ## Development Docs
@@ -123,4 +107,16 @@ Issues and PRs are welcome.
 ## License
 
 MIT License
+
+
+
+
+
+
+
+
+
+
+
+
 

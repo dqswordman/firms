@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { MapContainer, TileLayer, ScaleControl, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -111,10 +111,9 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
     return { type: 'FeatureCollection', features } as FireFeatureCollection;
   }, [fireCollection, filterEnabled, filterBy, filterThreshold]);
 
-  // propagate settings to parent (guarded against callback identity churn)
-  const prevSettingsJsonRef = React.useRef<string>("{}");
+  // propagate settings to parent
   React.useEffect(() => {
-    const settings = {
+    onSettingsChange?.({
       showHeatmap,
       showCluster,
       showStats,
@@ -130,13 +129,8 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
       filterBy,
       filterThreshold,
       filterAffectsAnalytics,
-    };
-    const json = JSON.stringify(settings);
-    if (json !== prevSettingsJsonRef.current) {
-      prevSettingsJsonRef.current = json;
-      onSettingsChange?.(settings);
-    }
-  }, [showHeatmap, showCluster, showStats, showTrends, showRadar, baseLayer, showGraticule, showCountryOutline, showStreetsRef, weightBy, threshold, filterEnabled, filterBy, filterThreshold, filterAffectsAnalytics]);
+    });
+  }, [showHeatmap, showCluster, showStats, showTrends, showRadar, baseLayer, showGraticule, showCountryOutline, showStreetsRef, weightBy, threshold, filterEnabled, filterBy, filterThreshold, filterAffectsAnalytics, onSettingsChange]);
 
   // Analytics data (optionally filtered by the same criteria)
   const analyticsDayPoints: FirePoint[] = useMemo(() => {
@@ -390,6 +384,7 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
     const lineRef = React.useRef<L.Polyline | null>(null);
     const tipsRef = React.useRef<L.Tooltip | null>(null);
     const pointsRef = React.useRef<L.LatLng[]>([]);
+    const rendererRef = React.useRef<L.SVG | null>(null);
 
     React.useEffect(() => {
       if (!layerRef.current) layerRef.current = L.layerGroup().addTo(map);
@@ -481,7 +476,6 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
     const savedRef = React.useRef<L.LayerGroup | null>(null);
     const cursorLineRef = React.useRef<L.Polyline | null>(null);
     const cursorTipRef = React.useRef<L.Tooltip | null>(null);
-    const rendererRef = React.useRef<L.SVG | null>(null);
     const pointsRef = React.useRef<L.LatLng[]>([]);
 
     React.useEffect(() => {
@@ -589,18 +583,18 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
       };
 
       const redraw = () => {
-        const layer = layerRef.current!;
-        // remove previous segment tips from live layer
-        segTipsRef.current.forEach(t => layer.removeLayer(t));
+        const saved = savedRef.current!;
+        // remove previous segment tips from saved group
+        segTipsRef.current.forEach(t => saved.removeLayer(t));
         segTipsRef.current = [];
         if (mode === 'distance') {
-          if (!lineRef.current) lineRef.current = L.polyline([], { color: '#22c55e', weight: 3, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(layer);
-          if (polyRef.current) { layer.removeLayer(polyRef.current); polyRef.current = null; }
+          if (!lineRef.current) lineRef.current = L.polyline([], { color: '#22c55e', weight: 3, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved);
+          if (polyRef.current) { saved.removeLayer(polyRef.current); polyRef.current = null; }
           lineRef.current.setLatLngs(pointsRef.current);
           if (lineRef.current.bringToFront) lineRef.current.bringToFront();
-          // draw vertex markers (live)
-          vertexRef.current.forEach(m => layer.removeLayer(m));
-          vertexRef.current = pointsRef.current.map(p => L.circleMarker(p, { radius: 4, color: '#22c55e', weight: 2, fillColor: '#0f172a', fillOpacity: 0.9, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(layer));
+          // draw vertex markers (persist in saved group)
+          vertexRef.current.forEach(m => saved.removeLayer(m));
+          vertexRef.current = pointsRef.current.map(p => L.circleMarker(p, { radius: 4, color: '#22c55e', weight: 2, fillColor: '#0f172a', fillOpacity: 0.9, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved));
           for (let i = 1; i < pointsRef.current.length; i++) {
             const a = pointsRef.current[i - 1];
             const b = pointsRef.current[i];
@@ -608,7 +602,7 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
             const lenKm = haversine(a, b);
             const tip = L.tooltip({ permanent: true, direction: 'top', offset: L.point(0, -4), className: 'measure-seg' })
               .setLatLng(mid).setContent(kmTo(lenKm));
-            tip.addTo(layer);
+            tip.addTo(saved);
             segTipsRef.current.push(tip);
           }
           const last = pointsRef.current[pointsRef.current.length - 1];
@@ -616,27 +610,27 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
           if (last) {
             if (!tipsRef.current) tipsRef.current = L.tooltip({ permanent: true, direction: 'top', offset: L.point(0, -6), className: 'measure-tooltip' });
             tipsRef.current.setLatLng(last).setContent(`Total: ${kmTo(totalKm)}`);
-            tipsRef.current.addTo(layer);
+            tipsRef.current.addTo(saved);
           } else if (tipsRef.current) {
-            layer.removeLayer(tipsRef.current);
+            saved.removeLayer(tipsRef.current);
             tipsRef.current = null;
           }
         } else {
-          if (lineRef.current) { layer.removeLayer(lineRef.current); lineRef.current = null; }
-          if (!polyRef.current) polyRef.current = L.polygon([], { color: '#22c55e', weight: 2, fillOpacity: 0.1, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(layer);
+          if (lineRef.current) { saved.removeLayer(lineRef.current); lineRef.current = null; }
+          if (!polyRef.current) polyRef.current = L.polygon([], { color: '#22c55e', weight: 2, fillOpacity: 0.1, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved);
           polyRef.current.setLatLngs(pointsRef.current);
           if (polyRef.current.bringToFront) polyRef.current.bringToFront();
-          // draw vertex markers (live)
-          vertexRef.current.forEach(m => layer.removeLayer(m));
-          vertexRef.current = pointsRef.current.map(p => L.circleMarker(p, { radius: 4, color: '#22c55e', weight: 2, fillColor: '#0f172a', fillOpacity: 0.9, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(layer));
+          // draw vertex markers (persist in saved group)
+          vertexRef.current.forEach(m => saved.removeLayer(m));
+          vertexRef.current = pointsRef.current.map(p => L.circleMarker(p, { radius: 4, color: '#22c55e', weight: 2, fillColor: '#0f172a', fillOpacity: 0.9, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved));
           const m2 = polygonAreaM2(pointsRef.current);
           if (pointsRef.current.length >= 3 && m2 > 0) {
             const center = polyRef.current.getBounds().getCenter();
             if (!tipsRef.current) tipsRef.current = L.tooltip({ permanent: true, direction: 'top', offset: L.point(0, -6), className: 'measure-tooltip' });
             tipsRef.current.setLatLng(center).setContent(`Area: ${formatArea(m2)}`);
-            tipsRef.current.addTo(layer);
+            tipsRef.current.addTo(saved);
           } else if (tipsRef.current) {
-            layer.removeLayer(tipsRef.current);
+            saved.removeLayer(tipsRef.current);
             tipsRef.current = null;
           }
         }
@@ -646,48 +640,17 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
         if (!enabled || pan) return;
         pointsRef.current.push(e.latlng);
         // draw immediate vertex anchor to avoid any flicker
-        if (layerRef.current) {
+        if (savedRef.current) {
           const v = L.circleMarker(e.latlng, { radius: 4, color: '#22c55e', weight: 2, fillColor: '#0f172a', fillOpacity: 0.9, pane: 'measure-pane', renderer: rendererRef.current! });
-          v.addTo(layerRef.current);
+          v.addTo(savedRef.current);
           vertexRef.current.push(v);
         }
         redraw();
       };
       const onDblClick = () => {
         if (!enabled) return;
-        const pts = pointsRef.current.slice();
-        const saved = savedRef.current ?? L.layerGroup().addTo(map);
-        savedRef.current = saved;
-        if ((mode === 'distance' && pts.length >= 2) || (mode === 'area' && pts.length >= 3)) {
-          if (mode === 'distance') {
-            const pl = L.polyline(pts, { color: '#22c55e', weight: 3, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved);
-            // vertices
-            pts.forEach(p => L.circleMarker(p, { radius: 4, color: '#22c55e', weight: 2, fillColor: '#0f172a', fillOpacity: 0.9, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved));
-            // per-segment labels
-            for (let i = 1; i < pts.length; i++) {
-              const a = pts[i - 1], b = pts[i];
-              const mid = L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
-              const lenKm = haversine(a, b);
-              L.tooltip({ permanent: true, direction: 'top', offset: L.point(0, -4), className: 'measure-seg' })
-                .setLatLng(mid).setContent(kmTo(lenKm)).addTo(saved);
-            }
-            const totalKm = pts.reduce((acc, cur, idx, arr) => idx ? acc + haversine(arr[idx - 1], cur) : 0, 0);
-            const last = pts[pts.length - 1];
-            L.tooltip({ permanent: true, direction: 'top', offset: L.point(0, -6), className: 'measure-tooltip' })
-              .setLatLng(last).setContent(`Total: ${kmTo(totalKm)}`).addTo(saved);
-          } else {
-            const pg = L.polygon(pts, { color: '#22c55e', weight: 2, fillOpacity: 0.1, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved);
-            pts.forEach(p => L.circleMarker(p, { radius: 4, color: '#22c55e', weight: 2, fillColor: '#0f172a', fillOpacity: 0.9, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved));
-            const m2 = polygonAreaM2(pts);
-            const center = pg.getBounds().getCenter();
-            L.tooltip({ permanent: true, direction: 'top', offset: L.point(0, -6), className: 'measure-tooltip' })
-              .setLatLng(center).setContent(`Area: ${formatArea(m2)}`).addTo(saved);
-          }
-        }
-        // clear live layer (preview + in-progress)
-        if (layerRef.current) layerRef.current.clearLayers();
-        lineRef.current = null; polyRef.current = null; cursorLineRef.current = null; cursorTipRef.current = null; tipsRef.current = null;
-        segTipsRef.current = []; vertexRef.current = []; pointsRef.current = [];
+        // finish current measurement session; keep what has been drawn in saved group
+        clearAll();
         onEnd?.();
       };
 
@@ -703,25 +666,24 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
         const curr = e.latlng;
         if (mode === 'distance') {
           const saved = savedRef.current!;
-          const pts = pointsRef.current.concat([curr]);
-          if (!cursorLineRef.current) cursorLineRef.current = L.polyline(pts, { color: '#22c55e', weight: 2, dashArray: '4 4', pane: 'measure-pane', renderer: rendererRef.current! }).addTo(layer);
-          cursorLineRef.current.setLatLngs(pts);
-          const baseKm = pointsRef.current.reduce((acc, p, i, arr) => i ? acc + haversine(arr[i - 1], p) : 0, 0);
-          const lenKm = baseKm + (pointsRef.current.length ? haversine(pointsRef.current[pointsRef.current.length - 1], curr) : 0);
+          if (!cursorLineRef.current) cursorLineRef.current = L.polyline([last, curr], { color: '#22c55e', weight: 2, dashArray: '4 4', pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved);
+          cursorLineRef.current.setLatLngs([last, curr]);
+          const lenKm = haversine(last, curr);
           if (!cursorTipRef.current) cursorTipRef.current = L.tooltip({ permanent: true, direction: 'top', offset: L.point(0, -6), className: 'measure-tip' });
-          cursorTipRef.current.setLatLng(curr).setContent(`Total: ${kmTo(lenKm)}`);
-          cursorTipRef.current.addTo(layer);
+          cursorTipRef.current.setLatLng(curr).setContent(kmTo(lenKm));
+          cursorTipRef.current.addTo(saved);
         } else {
           // area preview: polygon with current cursor as the last vertex
           const pts = pointsRef.current.concat([curr]);
-          if (!polyRef.current) polyRef.current = L.polygon([], { color: '#22c55e', weight: 2, fillOpacity: 0.1, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(layer);
+          const saved = savedRef.current!;
+          if (!polyRef.current) polyRef.current = L.polygon([], { color: '#22c55e', weight: 2, fillOpacity: 0.1, pane: 'measure-pane', renderer: rendererRef.current! }).addTo(saved);
           polyRef.current.setLatLngs(pts);
           const m2 = polygonAreaM2(pts.length >= 3 ? pts : []);
           if (m2 > 0) {
             const center = polyRef.current.getBounds().getCenter();
             if (!tipsRef.current) tipsRef.current = L.tooltip({ permanent: true, direction: 'top', offset: L.point(0, -6), className: 'measure-tooltip' });
             tipsRef.current.setLatLng(center).setContent(`Area: ${formatArea(m2)}`);
-            tipsRef.current.addTo(layer);
+            tipsRef.current.addTo(saved);
           }
         }
       };
@@ -776,7 +738,7 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
         const marker = L.marker([lat, lng]).addTo(map);
         markerRef.current = marker;
         const text = `Lat: ${lat.toFixed(6)}, Lon: ${lng.toFixed(6)}`;
-        const html = `<div style="font-size:12px;line-height:1.3">${text} <a href="#" id="copy-ll">濠电姰鍨煎▔娑氱矓閹绢喖鏄?/a></div>`;
+        const html = `<div style="font-size:12px;line-height:1.3">${text} <a href="#" id="copy-ll">婵犵數濮伴崹鐓庘枖濞戞氨鐭撻柟缁㈠枛閺?/a></div>`;
         marker.bindPopup(html).openPopup();
         setTimeout(() => {
           const el = document.getElementById('copy-ll');
@@ -836,171 +798,3 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
             />
           );
         }
-        if (base === 'blue-marble') {
-          return (
-            <TileLayer
-              url="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief/default/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg"
-              attribution='Imagery courtesy NASA GIBS'
-            />
-          );
-        }
-        return (
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; OpenStreetMap contributors'
-          />
-        );
-      })()}
-      {showCountryOutline && (
-        <TileLayer
-          url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-          attribution='Tiles &copy; Esri'
-        />
-      )}
-      {showStreetsRef && (
-        <TileLayer
-          url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
-          attribution='&copy; Esri Transportation'
-        />
-      )}
-      {showGraticule && <GraticuleLayer step={10} />}
-      {displayCollection.features.length > 0 && (
-        <>
-          {showHeatmap && (
-            <FireHeatmap
-              fireCollection={displayCollection}
-              weightBy={weightBy}
-              threshold={threshold}
-              max={maxWeight}
-            />
-          )}
-          {showCluster && <FireCluster fireCollection={displayCollection} interactionDisabled={measureMode} />}
-        </>
-      )}
-    </MapContainer>
-  );
-
-  const renderCharts = () => null;
-
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: '#0b1020' }}>
-      <AppBar position="fixed" color="default" sx={{ background: 'rgba(15,18,36,0.9)', backdropFilter: 'blur(6px)' }}>
-        <Toolbar>
-          <Typography variant="h6" sx={{ color: '#d7e3ff', letterSpacing: '0.5px' }}>FIRMS Wildfire Explorer</Typography>
-          <Box sx={{ flexGrow: 1 }} />
-          {currentDate && (
-            <Typography variant="body2" sx={{ color: '#94a3b8' }}>Date: {currentDate}</Typography>
-          )}
-        </Toolbar>
-      </AppBar>
-      <Toolbar />
-
-      {/* Search Form */}
-      <Box sx={{ position: 'absolute', top: 80, left: 16, zIndex: 1000 }}>
-        <SearchForm onSearch={onSearch} />
-      </Box>
-
-      {/* Visualization Controls */}
-      {renderVisualizationControls()}
-
-      {/* Main Map */}
-      {renderMap()}
-
-      {/* Time Slider: keep visible even if current day has 0 points */}
-      {dates.length > 0 && searchParams && (
-        <TimeSlider
-          dates={dates}
-          currentDate={currentDate}
-          onTimeChange={onDateChange}
-          params={searchParams}
-          onQuickRange={onQuickRange}
-          onRangeChange={(s, e) => setRangeDates({ start: s, end: e })}
-        />
-      )}
-
-      {/* Statistics and Charts Panel */}
-      {renderCharts()}
-
-      {/* Bottom toolbar */}
-      <Box sx={{ position: 'absolute', bottom: 90, left: '50%', transform: 'translateX(-50%)', zIndex: 1000 }}>
-        <Paper elevation={6} sx={{ p: 1, bgcolor: 'rgba(16,20,35,0.9)' }}>
-          <Stack direction="row" spacing={1}>
-            <Button size="small" variant={measureMode ? 'contained' : 'outlined'} color={measureMode ? 'warning' : 'info'} onClick={() => { setMeasureMode(v => !v); }}>MEASURE</Button>
-            <Button size="small" variant="outlined" color="info" onClick={() => { controlsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); controlsRef.current?.focus(); setHighlightLayers(true); setTimeout(() => setHighlightLayers(false), 1200); }}>LAYERS</Button>
-            <Button size="small" variant="contained" color="warning" onClick={() => setActiveTab('trend')}>TIMELINE</Button>
-            <Button size="small" variant="outlined" color="info" onClick={() => {
-              const url = window.location.origin + window.location.pathname + window.location.hash;
-              navigator.clipboard?.writeText(url);
-              alert('Share link copied');
-            }}>SHARE</Button>
-            <Button size="small" variant="outlined" color="info" onClick={() => setHelpOpen(true)}>HELP</Button>
-          </Stack>
-        </Paper>
-      </Box>
-      {measureMode && (
-        <Box sx={{ position: 'absolute', bottom: 160, left: 16, zIndex: 1200 }}>
-          <Paper elevation={6} sx={{ p: 1.5, minWidth: 260, bgcolor: 'rgba(16,20,35,0.95)' }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, color: '#e2e8f0' }}>MEASURE TOOL</Typography>
-            <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-              <Button size="small" variant={measureType === 'distance' ? 'contained' : 'outlined'} color="warning" onClick={() => setMeasureType('distance')}>DISTANCE</Button>
-              <Button size="small" variant={measureType === 'area' ? 'contained' : 'outlined'} color="warning" onClick={() => setMeasureType('area')}>AREA</Button>
-              <Button size="small" variant={panMode ? 'contained' : 'outlined'} color="info" onClick={() => setPanMode(v => !v)}>PAN</Button>
-              <Button size="small" variant="outlined" color="error" onClick={() => setMeasureClearToken(t => t + 1)}>CLEAR</Button>
-            </Stack>
-            {measureType === 'distance' ? (
-              <FormControl size="small" fullWidth>
-                <InputLabel id="unit-dist">Units</InputLabel>
-                <Select labelId="unit-dist" label="Units" value={distanceUnit} onChange={(e) => setDistanceUnit(e.target.value as any)}
-                  MenuProps={{ PaperProps: { sx: { zIndex: 20000 } }, slotProps: { paper: { sx: { zIndex: 20000 } } }, disablePortal: false, container: document.body }}>
-                  <MenuItem value="km">km</MenuItem>
-                  <MenuItem value="mi">mi</MenuItem>
-                  <MenuItem value="m">m</MenuItem>
-                </Select>
-              </FormControl>
-            ) : (
-              <FormControl size="small" fullWidth>
-                <InputLabel id="unit-area">Units</InputLabel>
-                <Select labelId="unit-area" label="Units" value={areaUnit} onChange={(e) => setAreaUnit(e.target.value as any)}
-                  MenuProps={{ PaperProps: { sx: { zIndex: 20000 } }, slotProps: { paper: { sx: { zIndex: 20000 } } }, disablePortal: false, container: document.body }}>
-                  <MenuItem value="km2">km虏</MenuItem>
-                  <MenuItem value="mi2">mi虏</MenuItem>
-                  <MenuItem value="ha">ha</MenuItem>
-                </Select>
-              </FormControl>
-            )}
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Click to add points; double-click to finish. Press ESC to cancel.
-            </Typography>
-          </Paper>
-        </Box>
-      )}
-            <Dialog open={helpOpen} onClose={() => setHelpOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Help</DialogTitle>
-        <DialogContent>
-          <Typography variant="subtitle2" sx={{ mt: 1 }}>Legend</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Heatmap gradient (left low to right high). Cluster size/color reflects count levels (10/50/100/200+).
-          </Typography>
-          <Box sx={{ my: 1, height: 10, borderRadius: 1, background: 'linear-gradient(90deg, #440154, #3b528b, #21918c, #5ec962, #fde725)' }} />
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>Filter</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Filter by FRP or Brightness; Apply to Analytics syncs to Statistics/Trend/Radar.
-          </Typography>
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>Timeline</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Supports range selection (dual slider) and single-day selection. Labels adapt to range length; current day is highlighted.
-          </Typography>
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>Measure</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Click to add points; double-click to finish.
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Note: The Location feature has been removed.
-          </Typography>
-        </DialogContent>
-      </Dialog>
-    </Box>
-  );
-};
-
-export default FireMap;
