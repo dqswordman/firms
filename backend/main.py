@@ -7,16 +7,14 @@ from datetime import datetime
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
-import requests
 import logging
 from fastapi import FastAPI, Query, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
-from requests.adapters import HTTPAdapter
 
-from services.geo import validate_country, country_to_bbox
+import re
 from utils.data_availability import check_data_availability
 from utils.urlbuilder import compose_urls
 from utils.geojson import to_geojson
@@ -26,9 +24,17 @@ from utils.http_exceptions import HTTPExceptionFactory
 load_dotenv()
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Wildfire Visualization API")
+
+# Read allowed origins from environment; default to local dev
+_allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+if _allowed_origins_env:
+    allowed_origins = [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
+else:
+    allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],  # More permissive during development
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -39,11 +45,10 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # NASA FIRMS API configuration
 MAP_KEY = os.getenv("FIRMS_MAP_KEY")
 if not MAP_KEY:
-    MAP_KEY = os.getenv("FIRMS_API_KEY")
-    if MAP_KEY:
-        print("Warning: environment variable FIRMS_API_KEY is deprecated, please use FIRMS_MAP_KEY")
-if not MAP_KEY:
-    MAP_KEY = "5d12184bae5da99a286386dd6e04de14"
+    legacy = os.getenv("FIRMS_API_KEY")
+    if legacy:
+        MAP_KEY = legacy
+        logger.warning("FIRMS_API_KEY is deprecated; please use FIRMS_MAP_KEY")
 SOURCE_WHITELIST = {
     "VIIRS_NOAA21_NRT",
     "VIIRS_NOAA20_NRT",
@@ -56,17 +61,46 @@ SOURCE_WHITELIST = {
 }
 
 DEFAULT_SOURCE_PRIORITY = [
+    "VIIRS_SNPP_NRT",
     "VIIRS_NOAA21_NRT",
     "VIIRS_NOAA20_NRT",
-    "VIIRS_SNPP_NRT",
     "MODIS_NRT",
-    "VIIRS_NOAA21_SP",
     "VIIRS_NOAA20_SP",
     "VIIRS_SNPP_SP",
     "MODIS_SP",
 ]
 
-MAX_CONCURRENT_REQUESTS = 5
+MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "5"))
+
+# Minimal ISO3 -> bbox mapping for common countries (west, south, east, north)
+COUNTRY_BBOX = {
+    "USA": (-179.14, 18.91, -66.97, 71.39),  # USA incl. Alaska/Hawaii (approx.)
+    "CHN": (73.66, 18.16, 134.77, 53.56),
+    "IND": (68.17665, 6.554607, 97.40256, 35.674545),
+    "RUS": (-180.0, 41.19, 180.0, 81.86),
+    "BRA": (-73.99, -33.77, -34.73, 5.27),
+    "AUS": (112.92, -43.74, 153.64, -10.06),
+    "CAN": (-141.0, 41.68, -52.65, 83.11),
+    "MEX": (-118.37, 14.53, -86.71, 32.72),
+    "IDN": (95.01, -10.36, 141.02, 5.90),
+    "ZAF": (16.45, -34.82, 32.89, -22.13),
+    "ARG": (-73.58, -55.11, -53.64, -21.78),
+    "COL": (-79.06, -4.23, -66.87, 13.39),
+    "SAU": (34.5, 16.37, 55.67, 32.16),
+    "IRN": (44.04, 25.06, 63.32, 39.78),
+    "TUR": (25.66, 35.82, 44.82, 42.11),
+    "FRA": (-5.14, 41.33, 9.56, 51.09),
+    "DEU": (5.87, 47.27, 15.04, 55.06),
+    "GBR": (-8.62, 49.84, 1.76, 60.85),
+    "ESP": (-9.3, 35.96, 3.32, 43.79),
+    "ITA": (6.62, 36.65, 18.51, 47.09),
+    "JPN": (122.94, 24.25, 153.99, 45.52),
+    "KOR": (125.07, 33.10, 131.87, 38.62),
+    "VNM": (102.14, 8.56, 109.47, 23.35),
+    "THA": (97.35, 5.61, 105.64, 20.42),
+    "PAK": (60.88, 23.69, 77.84, 37.08),
+    "BGD": (88.0, 20.74, 92.67, 26.63),
+}
 
 # ---------- Utility Functions ----------
 def _parse_date(d: Optional[str]) -> datetime.date:
@@ -81,6 +115,8 @@ def _parse_date(d: Optional[str]) -> datetime.date:
 
 def _bbox_ok(w,s,e,n):
     return -180<=w<e<=180 and -90<=s<n<=90
+
+ISO3_RE = re.compile(r"^[A-Z]{3}$")
 
 
 FIELD_MAPPINGS = {
@@ -117,55 +153,12 @@ def _transform_row(row: Dict, source: Optional[str] = None) -> Dict:
         transformed["source"] = source
     return transformed
 
-def _fetch_firms_data(url: str, retries: int = 3) -> List[Dict]:
-    """Fetch data from FIRMS API, return empty list if only headers exist."""
-    attempt = 0
-    while True:
-        attempt += 1
-        try:
-            resp = requests.get(url, timeout=(30, 120))
-            resp.raise_for_status()
-            logger.info(
-                "firms_request",
-                extra={"url": url, "status_code": resp.status_code, "retries": attempt - 1},
-            )
-            reader = csv.DictReader(io.StringIO(resp.text))
-            transformed_data = []
-            for row in reader:
-                if not any(row.values()):
-                    continue
-                transformed_data.append(_transform_row(row))
-            return transformed_data
-        except requests.Timeout as e:
-            logger.warning(
-                "firms_timeout",
-                extra={"url": url, "status_code": None, "retries": attempt - 1},
-            )
-            if attempt >= retries:
-                raise HTTPExceptionFactory.gateway_timeout(
-                    f"FIRMS request timeout: {str(e)}. "
-                    "Server is processing large amounts of data, please try again later."
-                )
-        except requests.RequestException as e:
-            status = e.response.status_code if isinstance(e, requests.HTTPError) and e.response else None
-            logger.warning(
-                "firms_error",
-                extra={"url": url, "status_code": status, "retries": attempt - 1},
-            )
-            if isinstance(e, requests.exceptions.HTTPError) and status == 404:
-                return []
-            if attempt >= retries:
-                raise HTTPExceptionFactory.bad_gateway(
-                    f"FIRMS request failed: {str(e)}. "
-                    "If failing repeatedly, try reducing the time span or using coordinate query."
-                )
-
-
 async def _fetch_firms_data_async(
     url: str, client: httpx.AsyncClient, source: str, retries: int = 3
 ) -> List[Dict]:
-    """异步获取并转换 FIRMS 数据"""
+    """异步获取并转换 FIRMS 数据，带指数退避与429处理"""
     attempt = 0
+    backoff_base = 1.5
     while True:
         attempt += 1
         try:
@@ -193,18 +186,25 @@ async def _fetch_firms_data_async(
                     "Server is processing large amounts of data, please try again later.",
                 )
         except httpx.HTTPError as e:
-            status = e.response.status_code if isinstance(e, httpx.HTTPStatusError) and e.response else None
+            status = e.response.status_code if isinstance(e, httpx.HTTPStatusError) and e.response else getattr(e, "status_code", None)
             logger.warning(
                 "firms_error",
                 extra={"url": url, "status_code": status, "retries": attempt - 1},
             )
-            if isinstance(e, httpx.HTTPStatusError) and status == 404:
+            if status == 404:
                 return []
+            if status == 429:
+                # Quota exceeded: surface as 503 with friendly message
+                raise HTTPExceptionFactory.service_unavailable(
+                    "FIRMS quota exceeded (429). Please reduce request frequency or wait a few minutes."
+                )
             if attempt >= retries:
                 raise HTTPExceptionFactory.bad_gateway(
                     f"FIRMS request failed: {str(e)}. "
                     "If failing repeatedly, try reducing the time span or using coordinate query.",
                 )
+        # backoff before retry if we will retry
+        await asyncio.sleep(min(30, (backoff_base ** (attempt - 1))))
 
 
 async def _stream_firms_data_async(
@@ -300,23 +300,29 @@ def _prepare_fire_query(
     response: Response,
 ) -> Optional[Tuple[List[str], str]]:
     """Validate parameters and compose request URLs."""
+    requested_country_mode = False
     if country:
+        requested_country_mode = True
         country = country.upper()
-        if not validate_country(country):
-            raise HTTPExceptionFactory.bad_request("Invalid ISO-3 country code")
+        if not ISO3_RE.fullmatch(country):
+            raise HTTPExceptionFactory.bad_request(
+                "Country code must be ISO-3 (3 uppercase letters)"
+            )
 
     if None not in (west, south, east, north):
         if not _bbox_ok(west, south, east, north):
             raise HTTPExceptionFactory.bad_request("Invalid coordinate range")
+        requested_country_mode = False
     elif country:
-        bbox = country_to_bbox(country)
+        # Derive bbox from ISO3 for country mode (v4 country endpoint is not available)
+        bbox = COUNTRY_BBOX.get(country)
         if not bbox:
-            raise HTTPExceptionFactory.bad_request("Invalid ISO-3 country code")
+            raise HTTPExceptionFactory.bad_request(
+                "Unknown or unsupported ISO-3 country code; please use bbox coordinates"
+            )
         west, south, east, north = bbox
     else:
-        raise HTTPExceptionFactory.bad_request(
-            "Must provide either country code or complete coordinate range"
-        )
+        raise HTTPExceptionFactory.bad_request("Must provide either country code or complete coordinate range")
 
     start = _parse_date(start_date)
     end = _parse_date(end_date)
@@ -352,6 +358,7 @@ def _prepare_fire_query(
         ] = "No data available for requested date range"
         return None
 
+    # Always use area URLs (bbox or derived country bbox)
     urls = compose_urls(
         MAP_KEY,
         selected_source,
@@ -359,15 +366,21 @@ def _prepare_fire_query(
         end,
         area=(west, south, east, north),
     )
+
+    # Log composed URLs for observability
+    for u in urls:
+        logger.info("firms_composed_url", extra={"url": u})
+
     return urls, selected_source
 
 
 async def _fetch_deduped_data(
-    urls: List[str], selected_source: str
+    urls: List[str], selected_source: str, max_concurrency: int
 ) -> List[Dict]:
     """Fetch all URLs concurrently and deduplicate records."""
-    async with httpx.AsyncClient() as client:
-        sem = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+    headers = {"Accept-Encoding": "gzip, deflate"}
+    async with httpx.AsyncClient(headers=headers) as client:
+        sem = asyncio.Semaphore(max(1, max_concurrency))
 
         async def fetch(url: str) -> List[Dict]:
             async with sem:
@@ -404,36 +417,7 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-@app.get("/debug")
-async def debug_endpoint():
-    """Debug endpoint to check raw response from FIRMS API"""
-    try:
-        # Use a known good request to USA for a short date range using v4 endpoint
-        url = (
-            "https://firms.modaps.eosdis.nasa.gov/api/country/csv/"
-            f"{MAP_KEY}/VIIRS_SNPP_NRT/USA/1/2023-07-01"
-        )
-        session = requests.Session()
-        session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
-        resp = session.get(url, timeout=(30, 120))
-        resp.raise_for_status()
-        
-        # Parse the first few rows of CSV data to see structure
-        data = list(csv.DictReader(io.StringIO(resp.text)))[:5]
-        
-        # Return debug information
-        return {
-            "status": resp.status_code,
-            "content_type": resp.headers.get('Content-Type', ''),
-            "sample_data": data,
-            "column_names": list(data[0].keys()) if data else [],
-            "transformed_sample": _fetch_firms_data(url)[:5]
-        }
-    except Exception as e:
-        return {"error": str(e)}
 
-        return to_geojson(deduped)
-    return deduped
 
 @app.get("/fires")
 async def get_fires(
@@ -449,8 +433,13 @@ async def get_fires(
     source_priority: Optional[str] = Query(
         None, alias="sourcePriority"
     ),
-    format: str = Query("json", regex="^(json|geojson)$"),
+    format: str = Query("geojson", pattern=r"^(json|geojson)$"),
+    max_concurrency: int = Query(MAX_CONCURRENT_REQUESTS, alias="maxConcurrency", ge=1, le=20),
 ):
+    # Ensure FIRMS MAP key configured
+    if not MAP_KEY:
+        raise HTTPExceptionFactory.service_unavailable("FIRMS_MAP_KEY is not configured on the server")
+
     prepared = _prepare_fire_query(
         country,
         west,
@@ -469,7 +458,8 @@ async def get_fires(
     if "application/x-ndjson" in request.headers.get("accept", ""):
         async def ndjson_stream() -> AsyncGenerator[bytes, None]:
             seen = set()
-            async with httpx.AsyncClient() as client:
+            headers = {"Accept-Encoding": "gzip, deflate"}
+            async with httpx.AsyncClient(headers=headers) as client:
                 for url in urls:
                     async for row in _stream_firms_data_async(
                         url, client, selected_source
@@ -489,7 +479,7 @@ async def get_fires(
 
         return StreamingResponse(ndjson_stream(), media_type="application/x-ndjson")
 
-    deduped = await _fetch_deduped_data(urls, selected_source)
+    deduped = await _fetch_deduped_data(urls, selected_source, max_concurrency)
     if format == "geojson":
         return to_geojson(deduped)
     return deduped
@@ -509,7 +499,12 @@ async def get_fire_stats(
     ),
     frp_high: float = Query(20, alias="frpHigh"),
     frp_mid: float = Query(5, alias="frpMid"),
+    max_concurrency: int = Query(MAX_CONCURRENT_REQUESTS, alias="maxConcurrency", ge=1, le=20),
 ) -> Dict[str, Any]:
+    # Ensure FIRMS MAP key configured
+    if not MAP_KEY:
+        raise HTTPExceptionFactory.service_unavailable("FIRMS_MAP_KEY is not configured on the server")
+
     prepared = _prepare_fire_query(
         country,
         west,
@@ -524,56 +519,7 @@ async def get_fire_stats(
     data: List[Dict] = []
     if prepared:
         urls, selected_source = prepared
-        data = await _fetch_deduped_data(urls, selected_source)
+        data = await _fetch_deduped_data(urls, selected_source, max_concurrency)
     return compute_stats(data, frp_mid, frp_high)
 
-@app.get("/cors-test")
-async def cors_test():
-    """Test endpoint to verify CORS is working properly"""
-    return {
-        "status": "success",
-        "message": "CORS is properly configured",
-        "allow_origins": ["http://localhost:3000"],
-        "test_data": [
-            {"latitude": "34.0522", "longitude": "-118.2437", "bright_ti4": "310.5", 
-             "acq_date": "2023-07-01", "acq_time": "1200"}
-        ]
-    } 
-
-@app.get("/debug-bbox")
-async def debug_bbox_endpoint():
-    """Debug endpoint to check BBOX API calls"""
-    try:
-        # Use sample boundary coordinates for testing
-        west = -100.0
-        south = 30.0
-        east = -80.0
-        north = 40.0
-        day_range = 1
-        start_date = "2023-07-01"
-        
-        # Build API URL - use 'area' instead of 'bbox' endpoint
-        base_url = f"https://firms.modaps.eosdis.nasa.gov/api/area/csv/{MAP_KEY}"
-
-        # Construct the URL according to v4 specs
-        nrt_url = f"{base_url}/VIIRS_SNPP_NRT/{west},{south},{east},{north}/{day_range}/{start_date}"
-        sp_url = f"{base_url}/VIIRS_SNPP_SP/{west},{south},{east},{north}/{day_range}/{start_date}"
-        
-        # Try calling the API
-        session = requests.Session()
-        session.mount("https://", requests.adapters.HTTPAdapter(max_retries=3))
-        
-        # Test the response of a single API call
-        resp = session.get(nrt_url, timeout=(30, 120))
-        
-        # Return debug information
-        return {
-            "nrt_url": nrt_url,
-            "sp_url": sp_url,
-            "status_code": resp.status_code,
-            "content_type": resp.headers.get('Content-Type', ''),
-            "raw_response": resp.text[:500] if resp.status_code == 200 else resp.text,
-            "transformed_sample": _fetch_firms_data(nrt_url)[:5] if resp.status_code == 200 else []
-        }
-    except Exception as e:
-        return {"error": str(e), "type": str(type(e))} 
+    # Removed debug endpoints for production hardening

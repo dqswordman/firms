@@ -1,5 +1,19 @@
 import React, { useState } from 'react';
 import { SearchParams } from '../types';
+import {
+  Paper,
+  Box,
+  Typography,
+  FormControl,
+  FormControlLabel,
+  RadioGroup,
+  Radio,
+  TextField,
+  Select,
+  MenuItem,
+  Button,
+  Divider
+} from '@mui/material';
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
@@ -15,155 +29,113 @@ const SearchForm: React.FC<SearchFormProps> = ({ onSearch }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [format, setFormat] = useState<'geojson' | 'json'>('geojson');
+  const [dataset, setDataset] = useState<string>('auto');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const params: SearchParams = {
-      mode,
-      startDate,
-      endDate,
-      source: 'modis',
-      format,
-    };
+    if (!startDate || !endDate) return alert('Please select a valid date range');
+    const sd = new Date(startDate);
+    const ed = new Date(endDate);
+    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) return alert('Invalid date format');
+    if (sd > ed) return alert('Start date must not be later than end date');
+    const today = new Date();
+    const edOnly = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (edOnly > todayOnly) return alert('End date cannot exceed today');
+    const diffDays = Math.floor((edOnly.getTime() - new Date(sd.getFullYear(), sd.getMonth(), sd.getDate()).getTime()) / (24*3600*1000)) + 1;
+    if (diffDays > 10) return alert('Time span cannot exceed 10 days');
 
+    const params: SearchParams = { mode, startDate, endDate, format };
     if (mode === 'country') {
-      if (!country) {
-        alert('Please enter a country code');
-        return;
-      }
+      if (!country) return alert('Please enter a country code');
       params.country = country.toUpperCase();
     } else {
-      if (!west || !south || !east || !north) {
-        alert('Please enter complete geographic boundary coordinates');
-        return;
-      }
+      if (!west || !south || !east || !north) return alert('Please enter complete geographic boundary coordinates');
       params.west = parseFloat(west);
       params.south = parseFloat(south);
       params.east = parseFloat(east);
       params.north = parseFloat(north);
     }
-
+    if (dataset && dataset !== 'auto') params.sourcePriority = dataset;
     onSearch(params);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 bg-white rounded shadow">
-      <div className="mb-4">
-        <label className="block mb-2">Query Mode:</label>
-        <div className="flex gap-4">
-          <label>
-            <input
-              type="radio"
-              value="country"
-              checked={mode === 'country'}
-              onChange={(e) => setMode(e.target.value as 'country')}
-              className="mr-2"
-            />
-            Country Code
-          </label>
-          <label>
-            <input
-              type="radio"
-              value="bbox"
-              checked={mode === 'bbox'}
-              onChange={(e) => setMode(e.target.value as 'bbox')}
-              className="mr-2"
-            />
-            Geographic Boundary
-          </label>
-        </div>
-      </div>
+    <Paper elevation={6} sx={{ p: 2, width: 360, maxWidth: '100%' }}>
+      <Box component="form" onSubmit={handleSubmit}>
+        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+          Query Mode
+        </Typography>
+        <FormControl fullWidth>
+          <RadioGroup row value={mode} onChange={(e) => setMode(e.target.value as 'country' | 'bbox')}>
+            <FormControlLabel value="country" control={<Radio size="small"/>} label="Country" />
+            <FormControlLabel value="bbox" control={<Radio size="small"/>} label="Bounding Box" />
+          </RadioGroup>
+        </FormControl>
 
-      {mode === 'country' ? (
-        <div className="mb-4">
-          <label className="block mb-2">Country Code (3 uppercase letters):</label>
-          <input
-            type="text"
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            className="w-full p-2 border rounded"
-            placeholder="e.g., USA"
-            maxLength={3}
-          />
-        </div>
-      ) : (
-        <div className="mb-4">
-          <label className="block mb-2">Geographic Boundary Coordinates:</label>
-          <div className="grid grid-cols-2 gap-4">
-            <input
-              type="number"
-              value={west}
-              onChange={(e) => setWest(e.target.value)}
-              className="p-2 border rounded"
-              placeholder="West Longitude"
-              step="any"
+        {mode === 'country' ? (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary">Country ISO3</Typography>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="e.g., USA"
+              inputProps={{ maxLength: 3, style: { textTransform: 'uppercase', letterSpacing: '2px' } }}
+              value={country}
+              onChange={(e) => setCountry(e.target.value.toUpperCase())}
             />
-            <input
-              type="number"
-              value={south}
-              onChange={(e) => setSouth(e.target.value)}
-              className="p-2 border rounded"
-              placeholder="South Latitude"
-              step="any"
-            />
-            <input
-              type="number"
-              value={east}
-              onChange={(e) => setEast(e.target.value)}
-              className="p-2 border rounded"
-              placeholder="East Longitude"
-              step="any"
-            />
-            <input
-              type="number"
-              value={north}
-              onChange={(e) => setNorth(e.target.value)}
-              className="p-2 border rounded"
-              placeholder="North Latitude"
-              step="any"
-            />
-          </div>
-      </div>
-    )}
+          </Box>
+        ) : (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary">Bounding Box</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+              <TextField fullWidth size="small" type="number" label="West" value={west} onChange={(e) => setWest(e.target.value)} />
+              <TextField fullWidth size="small" type="number" label="South" value={south} onChange={(e) => setSouth(e.target.value)} />
+              <TextField fullWidth size="small" type="number" label="East" value={east} onChange={(e) => setEast(e.target.value)} />
+              <TextField fullWidth size="small" type="number" label="North" value={north} onChange={(e) => setNorth(e.target.value)} />
+            </Box>
+          </Box>
+        )}
 
-    <div className="mb-4">
-      <label className="block mb-2">Date Range:</label>
-        <div className="grid grid-cols-2 gap-4">
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="p-2 border rounded"
-          />
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="p-2 border rounded"
-        />
-      </div>
-    </div>
+        <Divider sx={{ my: 1.5 }} />
 
-    <div className="mb-4">
-      <label className="block mb-2">Data Format:</label>
-      <select
-        value={format}
-        onChange={(e) => setFormat(e.target.value as 'geojson' | 'json')}
-        className="w-full p-2 border rounded"
-      >
-        <option value="geojson">GeoJSON</option>
-        <option value="json">JSON (legacy)</option>
-      </select>
-    </div>
+        <Typography variant="subtitle2" color="text.secondary">Date Range</Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+          <TextField fullWidth size="small" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <TextField fullWidth size="small" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </Box>
 
-      <button
-        type="submit"
-        className="w-full p-2 text-white bg-blue-500 rounded hover:bg-blue-600"
-      >
-        Query
-      </button>
-    </form>
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="subtitle2" color="text.secondary">Dataset (optional)</Typography>
+          <FormControl fullWidth size="small">
+            <Select value={dataset} onChange={(e) => setDataset(e.target.value)}>
+              <MenuItem value="auto">Auto (recommended)</MenuItem>
+              <MenuItem value="VIIRS_SNPP_NRT">VIIRS SNPP NRT</MenuItem>
+              <MenuItem value="VIIRS_NOAA21_NRT">VIIRS NOAA21 NRT</MenuItem>
+              <MenuItem value="VIIRS_NOAA20_NRT">VIIRS NOAA20 NRT</MenuItem>
+              <MenuItem value="MODIS_NRT">MODIS NRT</MenuItem>
+              <MenuItem value="VIIRS_NOAA20_SP">VIIRS NOAA20 SP</MenuItem>
+              <MenuItem value="VIIRS_SNPP_SP">VIIRS SNPP SP</MenuItem>
+              <MenuItem value="MODIS_SP">MODIS SP</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="subtitle2" color="text.secondary">Return Format</Typography>
+          <FormControl fullWidth size="small">
+            <Select value={format} onChange={(e) => setFormat(e.target.value as 'geojson' | 'json')}>
+              <MenuItem value="geojson">GeoJSON</MenuItem>
+              <MenuItem value="json">JSON (legacy)</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2 }}>
+          Query
+        </Button>
+      </Box>
+    </Paper>
   );
 };
 

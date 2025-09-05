@@ -43,35 +43,45 @@ def _combine_datetime(date_str: str | None, time_str: str | None) -> str | None:
 
 
 def to_geojson(records: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Convert FIRMS records to GeoJSON FeatureCollection."""
-    features = []
+    """Convert FIRMS records to GeoJSON FeatureCollection.
+
+    Includes commonly used raw fields to maximize frontend compatibility.
+    """
+    features: List[Dict[str, Any]] = []
     for row in records:
         lat = _parse_float(row.get("latitude"))
         lon = _parse_float(row.get("longitude"))
         if lat is None or lon is None:
             continue
 
-        brightness = _parse_float(row.get("bright_ti4"))
-        if brightness is None:
-            brightness = _parse_float(row.get("bright_ti5"))
+        # Brightness fields (prefer TI4 then TI5)
+        bright_ti4 = _parse_float(row.get("bright_ti4"))
+        bright_ti5 = _parse_float(row.get("bright_ti5"))
+        brightness = bright_ti4 if bright_ti4 is not None else bright_ti5
+
+        properties: Dict[str, Any] = {
+            # Normalized/derived fields
+            "brightness": brightness,
+            "frp": _parse_float(row.get("frp")),
+            "satellite": row.get("satellite"),
+            "instrument": row.get("instrument"),
+            "daynight": row.get("daynight"),
+            "source": row.get("source"),
+            "country_id": row.get("country_id"),
+            "confidence": _normalize_confidence(row.get("confidence")),
+            "confidence_text": row.get("confidence"),
+            "acq_datetime": _combine_datetime(row.get("acq_date"), row.get("acq_time")),
+            # Raw fields preserved for UI components
+            "acq_date": row.get("acq_date"),
+            "acq_time": row.get("acq_time"),
+            "bright_ti4": row.get("bright_ti4"),
+            "bright_ti5": row.get("bright_ti5"),
+        }
 
         feature = {
             "type": "Feature",
             "geometry": {"type": "Point", "coordinates": [lon, lat]},
-            "properties": {
-                "brightness": brightness,
-                "frp": _parse_float(row.get("frp")),
-                "satellite": row.get("satellite"),
-                "instrument": row.get("instrument"),
-                "daynight": row.get("daynight"),
-                "source": row.get("source"),
-                "country_id": row.get("country_id"),
-                "confidence": _normalize_confidence(row.get("confidence")),
-                "confidence_text": row.get("confidence"),
-                "acq_datetime": _combine_datetime(
-                    row.get("acq_date"), row.get("acq_time")
-                ),
-            },
+            "properties": properties,
         }
         features.append(feature)
     return {"type": "FeatureCollection", "features": features}

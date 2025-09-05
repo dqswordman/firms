@@ -1,3 +1,61 @@
+# Agent Operating Guide (Codex CLI)
+
+This document describes how our agent (Codex CLI) collaborates in this repo. It encodes the habits we agreed in the project so future sessions can “plug in and go”.
+
+## Workflow Principles
+
+- Single Source of Truth for progress and changes:
+  - UPDATE.md: Every meaningful change must append a concise entry (what/why/where).
+  - todo list.md: Any request that cannot be completed in one pass is broken into actionable TODOs and kept up to date (check off when completed).
+  - README.md: If UX, setup, endpoints, or run-instructions change, README must be updated in the same PR/change set.
+- Planning: Use the plan tool (update_plan) for multi-step tasks; keep exactly one in-progress step.
+- Surgical edits: Use apply_patch; avoid unrelated churn.
+- Validation first: Prefer running TypeScript compile (`npx tsc --noEmit`) and basic Python syntax checks (`python -m py_compile`) after changes.
+- One-shot data loading philosophy on frontend: fetch once per date range; filter client-side for day-by-day interactions.
+- Backend calls FIRMS v4 area endpoints; country is mapped to a bbox; keep ISO3 validation lightweight.
+
+## Daily Flow (Checklist)
+
+1) Understand request and scope. If multi-step, call update_plan with steps.
+2) Implement changes with apply_patch.
+3) Validate locally:
+   - Frontend: `cd frontend && npx tsc -p tsconfig.json --noEmit`
+   - Backend: `python -m py_compile backend/main.py`
+4) Documentation discipline:
+   - Append UPDATE.md with a dated entry (bullets: backend, frontend, docs, housekeeping).
+   - Update todo list.md for outstanding items (Must/Should/Could classification when relevant).
+   - Update README.md if setup, UI layout, routes, env, or usage changed.
+5) Summarize to user with what changed, where, and next steps.
+
+## File Conventions
+
+- UPDATE.md: Reverse-chronological updates. Include impacted files when helpful.
+- todo list.md: Must / Should / Could sections with AC (Acceptance Criteria) and a mini task list. Mark completed/ongoing.
+- backend/.env: Contains `FIRMS_MAP_KEY` (MAP key) and `ALLOWED_ORIGINS` for local dev.
+- frontend/.env: Contains `REACT_APP_API_URL` for API base.
+
+## Frontend Architecture (current)
+
+- One-shot range fetch via `useFiresQuery`; time slider filters by `acq_date` locally.
+- Right panel contains:
+  - Visualization: Heatmap/Clusters, weight and threshold.
+  - Overlays: Country Outline, Graticule, Street Ref.
+  - Basemap: OSM, CARTO Dark, Esri Satellite, Stamen Toner, OpenTopoMap, BlueMarble (if CORS allows).
+  - Analytics (second row): Statistics / Trend / Radar tabs.
+- URL Hash encodes mode/region/dates/current/layers/viewport to support share/restore.
+
+## Backend Architecture (current)
+
+- FastAPI with FIRMS v4 area CSV endpoints.
+- Country→BBOX mapping for common ISO3 (e.g., USA, CHN, THA …); otherwise encourage bbox.
+- Data availability checked against `/api/data_availability/csv/{MAP_KEY}/ALL` before constructing URLs.
+
+## Coding Standards
+
+- TypeScript strictness: add minimal types; guard optional fields and number parsing.
+- Python: prefer Pydantic v2 style models for parameter schemas; centralized HTTP errors with HTTPExceptionFactory.
+- Avoid logging secrets; keep MAP key in .env.
+
 # FIRMS Wildfire Data Visualization System
 
 ## System Architecture

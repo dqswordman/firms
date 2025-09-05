@@ -36,7 +36,7 @@ const FireStatsPanel: React.FC<FireStatsPanelProps> = ({ firePoints, currentDate
     let aquaCount = 0;
 
     firePoints.forEach(point => {
-      const frp = point.frp ? parseFloat(point.frp) : 0;
+      const frp = typeof point.frp === 'number' ? point.frp : (point.frp ? parseFloat(point.frp) : 0);
       totalFrp += frp;
       maxFrp = Math.max(maxFrp, frp);
 
@@ -46,14 +46,20 @@ const FireStatsPanel: React.FC<FireStatsPanelProps> = ({ firePoints, currentDate
         nightCount++;
       }
 
-      if (point.confidence) {
-        const confidence = point.confidence.toLowerCase();
-        if (confidence === 'h' || (confidence.match(/^\d+$/) && parseInt(confidence) >= 80)) {
-          highConfidence++;
-        } else if (confidence === 'n' || (confidence.match(/^\d+$/) && parseInt(confidence) >= 30)) {
-          mediumConfidence++;
+      if (point.confidence !== undefined && point.confidence !== null) {
+        if (typeof point.confidence === 'number') {
+          if (point.confidence >= 80) highConfidence++;
+          else if (point.confidence >= 30) mediumConfidence++;
+          else lowConfidence++;
         } else {
-          lowConfidence++;
+          const confidence = point.confidence.toLowerCase();
+          if (confidence === 'h' || (confidence.match(/^\d+$/) && parseInt(confidence) >= 80)) {
+            highConfidence++;
+          } else if (confidence === 'n' || (confidence.match(/^\d+$/) && parseInt(confidence) >= 30)) {
+            mediumConfidence++;
+          } else {
+            lowConfidence++;
+          }
         }
       } else {
         // If confidence is undefined, count as low confidence

@@ -10,6 +10,11 @@ body {
   flex-direction: column;
 }
 
+/* 测距/定位时，关闭 overlay pane 的指针事件，避免图层拦截 click */
+.l-interact-off .leaflet-overlay-pane * {
+  pointer-events: none !important;
+}
+
 .App-logo {
   height: 40vmin;
   pointer-events: none;

@@ -15,6 +15,7 @@
     "@vgrid/react-leaflet-heatmap-layer": "^4.0.3",
     "ajv": "^6.12.6",
     "ajv-keywords": "^3.5.2",
+    "chart.js": "^4.4.9",
     "chartjs-adapter-date-fns": "^3.0.0",
     "date-fns": "^2.30.0",
     "leaflet": "^1.9.4",

@@ -17,7 +17,8 @@ import {
 } from 'chart.js';
 import { format, eachDayOfInterval, startOfDay, endOfDay } from 'date-fns';
 import 'chartjs-adapter-date-fns';
-import { FirePoint } from '../types';
+import { FirePoint, SearchParams } from '../types';
+import { toast } from 'react-toastify';
 
 // Register Chart.js components
 ChartJS.register(
@@ -39,25 +40,71 @@ interface DailyStats {
 }
 
 interface FireTrendChartProps {
-  firePoints: FirePoint[];
+  firePoints: FirePoint[]; // current-day (fallback)
   startDate: Date;
   endDate: Date;
+  params: SearchParams;
+  allPoints?: FirePoint[]; // optional: full-range points to avoid refetch
+  viewStartDate?: Date; // optional: restrict to selected view range
+  viewEndDate?: Date;   // optional: restrict to selected view range
 }
 
 type ChartDataType = ChartData<'line', { x: Date; y: number }[], unknown>;
 
-const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, endDate }) => {
+const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, endDate, params, allPoints, viewStartDate, viewEndDate }) => {
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<ChartJS<'line', { x: Date; y: number }[], unknown> | null>(null);
+  const [seriesPoints, setSeriesPoints] = React.useState<FirePoint[]>(allPoints ?? []);
+  const [loading, setLoading] = React.useState(false);
+
+  // Fetch full-range data for time series (JSON for lighter payload)
+  useEffect(() => {
+    if (allPoints && allPoints.length > 0) {
+      setSeriesPoints(allPoints);
+      return;
+    }
+    let aborted = false;
+    const fetchSeries = async () => {
+      if (!params) return;
+      setLoading(true);
+      try {
+        const queryParams = new URLSearchParams();
+        if (params.mode === 'country' && params.country) {
+          queryParams.append('country', params.country);
+        } else if (params.mode === 'bbox' && params.west != null && params.south != null && params.east != null && params.north != null) {
+          queryParams.append('west', params.west.toString());
+          queryParams.append('south', params.south.toString());
+          queryParams.append('east', params.east.toString());
+          queryParams.append('north', params.north.toString());
+        }
+        queryParams.append('start_date', params.startDate);
+        queryParams.append('end_date', params.endDate);
+        if (params.sourcePriority) queryParams.append('sourcePriority', params.sourcePriority);
+        queryParams.append('format', 'json');
+
+        const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+        const res = await fetch(`${baseUrl}/fires?${queryParams.toString()}`);
+        if (!res.ok) throw new Error(`Failed to fetch series: ${res.status}`);
+        const data: FirePoint[] = await res.json();
+        if (!aborted) setSeriesPoints(data);
+      } catch (err: any) {
+        if (!aborted) toast.error(err?.message || '获取趋势数据失败');
+      } finally {
+        if (!aborted) setLoading(false);
+      }
+    };
+    fetchSeries();
+    return () => { aborted = true; };
+  }, [params, allPoints]);
 
   // Calculate daily statistics using useMemo
   const dailyStats = useMemo(() => {
-    if (firePoints.length === 0) return [];
+    const points = seriesPoints.length > 0 ? seriesPoints : firePoints;
+    if (points.length === 0) return [];
 
-    const allDays = eachDayOfInterval({
-      start: startOfDay(startDate),
-      end: endOfDay(endDate)
-    });
+    const startD = startOfDay(viewStartDate || startDate);
+    const endD = endOfDay(viewEndDate || endDate);
+    const allDays = eachDayOfInterval({ start: startD, end: endD });
 
     const statsMap = new Map(
       allDays.map(date => [
@@ -66,19 +113,22 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
       ])
     );
 
-    firePoints.forEach(point => {
+    points.forEach(point => {
       const dateStr = point.acq_date;
+      if (!dateStr) return;
       const stats = statsMap.get(dateStr);
       if (stats) {
         stats.count += 1;
         if (point.frp) {
-          stats.totalFrp += parseFloat(point.frp);
+          const frpVal = typeof point.frp === 'number' ? point.frp : parseFloat(point.frp);
+          if (!isNaN(frpVal)) stats.totalFrp += frpVal;
         }
       }
     });
 
     return Array.from(statsMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [firePoints, startDate, endDate]);
+  }, [firePoints, seriesPoints, startDate, endDate, viewStartDate, viewEndDate]);
+  
 
   // Prepare chart data
   const chartData = useMemo<ChartDataType>(() => ({
@@ -118,6 +168,7 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
   const options = useMemo<ChartOptions<'line'>>(() => ({
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     interaction: {
       mode: 'index',
       intersect: false,
@@ -178,51 +229,32 @@ const FireTrendChart: React.FC<FireTrendChartProps> = ({ firePoints, startDate, 
     }
   }), []);
 
-  // Initialize and update chart
+  // Initialize chart once, then update data without destroy to avoid jitter
   useEffect(() => {
-    let chart: ChartJS<'line', { x: Date; y: number }[], unknown> | null = null;
-
-    const initChart = () => {
-      if (!chartRef.current || dailyStats.length === 0) return;
-
-      const ctx = chartRef.current.getContext('2d');
-      if (!ctx) return;
-
-      // Destroy existing chart if it exists
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-        chartInstance.current = null;
-      }
-
-      // Create new chart
-      chart = new ChartJS<'line', { x: Date; y: number }[], unknown>(ctx, {
+    const ctx = chartRef.current?.getContext('2d');
+    if (!ctx) return;
+    if (!chartInstance.current) {
+      chartInstance.current = new ChartJS<'line', { x: Date; y: number }[], unknown>(ctx, {
         type: 'line',
         data: chartData,
-        options: options
+        options: options,
       });
-
-      chartInstance.current = chart;
-    };
-
-    // Initialize chart
-    initChart();
-
-    // Cleanup
+    }
     return () => {
-      if (chart) {
-        chart.destroy();
-        chart = null;
-      }
       if (chartInstance.current) {
         chartInstance.current.destroy();
         chartInstance.current = null;
       }
     };
-  }, [chartData, options, dailyStats]);
+  }, [options]);
 
-  if (firePoints.length === 0) {
-    return null;
-  }
+  // Update chart data when stats change
+  useEffect(() => {
+    const inst = chartInstance.current;
+    if (!inst) return;
+    inst.data = chartData as any;
+    inst.update('none');
+  }, [chartData]);
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-lg">

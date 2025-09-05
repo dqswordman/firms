@@ -1,19 +1,21 @@
 declare module '@vgrid/react-leaflet-heatmap-layer' {
-  import { Component } from 'react';
+  import React from 'react';
 
-  interface HeatmapLayerProps {
-    points: Array<{
-      lat: number;
-      lng: number;
-      intensity: number;
-    }>;
+  interface HeatmapLayerProps<T = any> {
+    points: T[];
     radius?: number;
     blur?: number;
     max?: number;
+    maxZoom?: number;
     gradient?: {
       [key: number]: string;
     };
+    fitBoundsOnLoad?: boolean;
+    fitBoundsOnUpdate?: boolean;
+    latitudeExtractor?: (m: T) => number;
+    longitudeExtractor?: (m: T) => number;
+    intensityExtractor?: (m: T) => number;
   }
 
-  export const HeatmapLayerFactory: () => React.FC<HeatmapLayerProps>;
+  export const HeatmapLayerFactory: <T = any>() => React.FC<HeatmapLayerProps<T>>;
 } 

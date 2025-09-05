@@ -1,156 +1,126 @@
 # FIRMS Wildfire Data Visualization System
 
-A global wildfire data visualization system based on NASA FIRMS API, supporting country or region-based queries and time series data display.
+A global wildfire data visualization system based on NASA FIRMS API, supporting country/bbox queries and time series visualization.
 
 ## Features
 
-- Global wildfire data visualization with an interactive map
-- Country or region-based query support
-- Time series data display with a date slider
-- Automatic splitting of date ranges longer than 10 days
-- Detailed wildfire point information
+- Global wildfire visualization with an interactive map
+- Country or bbox-based queries with strict date validation (<= 10 days, end <= today)
+- One-shot range fetch; client-side day filtering via time slider
 - Multiple visualization layers:
-  - Heatmap (always visible)
-  - Clusters (always visible)
-  - Statistics Panel (toggleable)
-  - Trend Chart (toggleable)
-  - Radar Chart (toggleable)
-- Responsive design with a modern interface
+  - Heatmap
+  - Clusters
+  - Overlays: Country Outline, Graticule, Street Ref
+  - Analytics: Statistics / Trend / Radar
+- Responsive UI with MUI and Tailwind CSS
 
 ## Quick Start
 
-### Clone the Project
-```bash
-git clone https://github.com/yourusername/firms.git
-cd firms
-```
-
 ### Start Backend
-1. Navigate to backend directory:
-```bash
-cd backend
-```
-
-2. Create virtual environment:
-```bash
-python -m venv venv
-.\venv\Scripts\activate  # Windows
-source venv/bin/activate  # Linux/Mac
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Configure environment variables:
-Create `.env` file and add your FIRMS MAP key:
+1) `cd backend`
+2) Create and activate venv
+   - Windows: `python -m venv venv && .\venv\Scripts\activate`
+   - macOS/Linux: `python -m venv venv && source venv/bin/activate`
+3) Install deps: `pip install -r requirements.txt`
+4) Create `backend/.env`
 ```
 FIRMS_MAP_KEY=your_map_key_here
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
-If `FIRMS_MAP_KEY` is not set, the application will fallback to the deprecated `FIRMS_API_KEY` and print a warning.
+5) Run: `uvicorn main:app --reload`
 
-5. Start server:
-```bash
-uvicorn main:app --reload
-```
-
-The backend now uses NASA FIRMS API v4 endpoints and supports a `source` query parameter (default `VIIRS_SNPP_NRT`).
+The backend uses NASA FIRMS v4 endpoints and supports `sourcePriority` to control dataset selection.
 
 ### Start Frontend
-1. Navigate to frontend directory:
-```bash
-cd frontend
+1) `cd frontend`
+2) `npm install`
+3) Create `frontend/.env`
 ```
-
-2. Install dependencies:
-```bash
-npm install
+REACT_APP_API_URL=http://localhost:8000
 ```
+4) `npm start` and open http://localhost:3000
 
-3. Start development server:
-```bash
-npm start
-```
+## UI Overview (NASA style)
 
-Now you can access the application at http://localhost:3000 in your browser.
+- Top bar: dark translucent header with current date
+- Left panel: Query card (Country/BBox, Date Range, Dataset, Format)
+- Right panel: grouped sections (Fires / Overlays / Backgrounds / Analytics)
+  - Analytics tabs: Statistics / Trend / Radar
+  - Settings persist in URL hash; when absent, restore from localStorage
+  - Fires section includes optional Filter (FRP/Brightness) applied to map layers
+- Bottom: Time slider with quick ranges (Today / 24H / 48H / 7D / WEEK)
+  - Shows month ticks and highlights the current date
+  - Toolbar actions: Measure（距离/面积测量：点击加点，双击结束；支持单位切换 / 清空 / Pan 暂停）、Help（打开帮助对话框）
+  - Note: The Location action has been removed
+- Note: Legend panel is temporarily removed to avoid dropdown overlap (Trend/Radar, Select poppers)
 
 ## Usage Guide
 
-1. Query Methods:
-   - Country Query: Enter country code (e.g., CHN for China)
-   - Region Query: Enter latitude and longitude range
-
-2. Time Selection:
-   - Use time slider to select specific date
-   - Use forward/backward buttons to navigate adjacent dates
-   - Date ranges exceeding 10 days are automatically split into multiple requests
-
-3. Visualization Controls:
-   - Heatmap and Clusters are always visible
-   - Statistics Panel: Toggle to show/hide detailed statistics
-   - Trend Chart: Toggle to show/hide fire point trends
-   - Radar Chart: Toggle to show/hide FRP and day/night distribution
-
-4. Data Display:
- - Map shows wildfire locations with heatmap and clustering
-  - Click on points to view detailed information
-  - Support map zoom and pan
-  - Multiple visualization layers for comprehensive analysis
+1) Query
+   - Country: ISO3 (e.g., CHN)
+   - BBox: lat/lon min/max
+2) Time selection
+   - Use time slider to pick the day; quick-range buttons adjust range
+3) Visualization controls
+   - Heatmap, Clusters, Overlays toggles; Analytics tabs in the right panel
+4) Map interactions
+   - Pan/zoom the map; click clusters or points for details
 
 ## 前端数据获取策略
 
-前端采用 TanStack Query 统一管理火点数据请求：
+- 使用 TanStack Query 统一管理火点数据请求
+- 以 `(mode, source, country|bbox, startDate, endDate, format)` 作为缓存键
+- 在选定日期区间内仅请求一次；时间滑块切换按 `acq_date` 本地过滤
+- 失败采用指数退避策略并弹出提示；可用 React Query Devtools 观察缓存命中
 
-- 以 `(mode, source, country|bbox, startDate, endDate, format)` 作为缓存键；
-- 时间滑块切换日期时，会自动预取相邻的前后一天数据，提高快速切换体验；
-- 请求失败时使用指数退避策略重试，最终失败会弹出 Toast 提示；
-- 可通过 React Query Devtools 查看缓存命中情况。
+## Measure 功能说明（对齐 NASA 体验）
+
+- 模式：Distance / Area
+- 单位：距离 km / mi / m；面积 km² / mi² / ha（可切换）
+- 交互：点击加点，双击结束；ESC 取消当前绘制；Clear 清空；Pan 暂停绘制以便拖动地图
+- 显示：
+  - 距离：分段里程标注（每段中点），末端显示 Total
+  - 面积：闭合多边形后在中心显示 Area（未闭合不计算）
+- UI：开启后左下显示“MEASURE TOOL”卡片（模式、单位、Pan、Clear）
+
+实现位置：`frontend/src/components/FireMap.tsx`（MeasureLayerPro）
 
 ## Changelog
 
+Latest changes are recorded in `UPDATE.md`.
+
 ### July 2, 2025
-- **Frontend Improvements:**
-  - Fixed TypeScript errors related to optional fields in FirePoint interface
-  - Enhanced components to handle missing data gracefully (FireRadarChart, FireStatsPanel, FireTrendChart)
-  - Improved error handling in data visualization components
-
-- **Backend API Updates:**
-  - Fixed geographic boundary query to align with NASA FIRMS API specifications
-  - Corrected URL construction for area-based queries
-  - Added debugging endpoints for easier troubleshooting
-  - Maintained backward compatibility for country-based queries
-
-- **General Enhancements:**
-  - Increased application robustness for varying data formats
-  - Improved error reporting and handling
-  - Enhanced data validation throughout the application
+- Frontend: fixed TypeScript optional fields handling; improved error handling in charts
+- Backend: align area queries with FIRMS v4; improved validation; debugging endpoints removed later
 
 ## Technology Stack
 
 ### Frontend
-- React 18
-- TypeScript
-- Leaflet + react-leaflet
-- Leaflet.markercluster
+- React 18, TypeScript
+- Leaflet + react-leaflet + leaflet.markercluster
 - Chart.js + react-chartjs-2
-- Tailwind CSS
-- date-fns
+- Tailwind CSS, date-fns, MUI
 
 ### Backend
-- FastAPI
-- Python 3.8+
-- Requests
-- python-dotenv
+- FastAPI, uvicorn
+- requests, python-dotenv
 
-## Development Documentation
+## Troubleshooting
 
-For detailed development documentation, please refer to [AGENTS.md](AGENTS.md).
+- 503 Service Unavailable: ensure `FIRMS_MAP_KEY` exists and restart backend
+- 400 Bad Request: check ISO3/bbox; date span <= 10 days; end date <= today
+- 429 Too Many Requests: FIRMS quota exceeded — wait or reduce request size
+- CORS blocked: include frontend origin in `ALLOWED_ORIGINS`
+
+## Development Docs
+
+See `AGENTS.md` for engineering workflow and conventions.
 
 ## Contributing
 
-Issues and Pull Requests are welcome!
+Issues and PRs are welcome.
 
 ## License
 
 MIT License
+

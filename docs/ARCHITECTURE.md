@@ -1,19 +1,20 @@
-# 数据流架构变更
+# 架构说明
 
-前端地图现在直接消费 GeoJSON `FeatureCollection` 作为火点数据源。`useFiresQuery` 钩子在请求后端时通过 `format` 参数选择数据格式，默认返回 GeoJSON；当选择旧版 `json` 格式时会在前端转换为 `FeatureCollection` 以保持统一的数据面向。
+前端使用 React + TypeScript 构建，地图采用 Leaflet（react-leaflet），点聚合使用 supercluster，图表使用 Chart.js。样式使用 Tailwind CSS。数据请求使用 TanStack Query 统一管理，并支持预取相邻日期以优化时间滑块体验。
 
-`FireMap` 统一传递 `FeatureCollection` 给 `FireHeatmap` 与 `FireCluster` 图层。图层可以在控制面板中独立开关，热力图支持通过 `weightBy` 选项在 `frp` 与 `brightness` 间切换，并提供阈值滑杆过滤低权重火点。
+后端使用 FastAPI，对接 NASA FIRMS v4 CSV 接口，负责：
+- 参数校验（ISO3 国家与 BBOX 坐标、日期范围 ≤ 10 天、结束日期不超过今天）
+- 数据源可用性检查（`/api/data_availability`）并按优先级选择合适的数据集
+- 跨日期段（最多 10 天一段）拆分请求，异步并发抓取与去重
+- 输出 JSON 或 GeoJSON，支持 NDJSON 流式输出
 
-统计、趋势及雷达图等组件仍基于属性数组 (`FirePoint[]`) 工作，`FireMap` 从 `FeatureCollection` 中提取属性后传递给这些组件，确保交互流程与旧版保持一致。
+数据流：
 
-整体数据流如下：
+SearchForm（查询条件） → useFiresQuery（按天请求） → FireMap（FeatureCollection）
+  ├─ FireHeatmap（热力图，支持 FRP/亮度，阈值过滤）
+  ├─ FireCluster（聚合点）
+  ├─ TimeSlider（按天切换，预取前后一天）
+  └─ Charts（统计与趋势）
 
-```
-SearchForm -> useFiresQuery (format=geojson|json) -> FireMap
-  ├─ FireHeatmap (FeatureCollection, weightBy, threshold)
-  ├─ FireCluster (FeatureCollection)
-  └─ Charts (FirePoint[])
-```
-
-通过上述调整，前端在保持旧数据格式兼容的同时，完成了对 GeoJSON 数据结构与可配置图层的适配。
+其中趋势组件在展示时，会按整个日期范围额外请求一次 JSON 数据用于绘制日级趋势。
 
