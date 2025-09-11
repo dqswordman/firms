@@ -31,6 +31,10 @@ ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
 The backend uses NASA FIRMS v4 endpoints and supports `sourcePriority` to control dataset selection.
 
+Note on API keys:
+- FIRMS returns HTTP 200 with plain text like "Invalid MAP_KEY." for bad keys. The backend now detects this and responds 503 with a clear error. If you see empty results, verify your key.
+- Obtain a valid FIRMS API Map Key from the FIRMS portal (Manage API keys). Replace `FIRMS_MAP_KEY` and restart the backend.
+
 ### Start Frontend
 1) `cd frontend`
 2) `npm install`
@@ -46,7 +50,7 @@ REACT_APP_API_URL=http://localhost:8000
 - Left panel: Query card (Country/BBox, Date Range, Dataset, Format)
 - Right panel: grouped sections (Fires / Overlays / Backgrounds / Analytics)
   - Analytics tabs: Statistics / Trend / Radar
-  - Settings persist in URL hash; when absent, restore from localStorage
+  - Settings do not persist across sessions (URL hash/localStorage disabled)
   - Fires section includes optional Filter (FRP/Brightness) applied to map layers
 - Bottom: Time slider with quick ranges (Today / 24H / 48H / 7D / WEEK)
   - Shows month ticks and highlights the current date

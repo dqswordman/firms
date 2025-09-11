@@ -35,11 +35,25 @@ const fetchFires = async (params: FireQueryParams): Promise<FireFeatureCollectio
     const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
     const res = await fetch(`${baseUrl}/fires?${queryParams.toString()}`);
     if (!res.ok) {
-      throw new Error('Failed to fetch fire data');
+      let msg = 'Failed to fetch fire data';
+      try {
+        const body = await res.json();
+        if (body && typeof body === 'object') {
+          msg = body.message || body.detail?.message || msg;
+        }
+      } catch {}
+      throw new Error(msg);
     }
     const data = await res.json();
     if (params.format === 'geojson') {
-      return data as FireFeatureCollection;
+      // Ensure we always return a valid FeatureCollection
+      if (data && typeof data === 'object' && data.type === 'FeatureCollection' && Array.isArray((data as any).features)) {
+        return data as FireFeatureCollection;
+      }
+      if (Array.isArray(data)) {
+        return { type: 'FeatureCollection', features: [] } as FireFeatureCollection;
+      }
+      throw new Error('Invalid GeoJSON response');
     }
     const points = data as FirePoint[];
     const features: FireFeature[] = points.map(point => ({

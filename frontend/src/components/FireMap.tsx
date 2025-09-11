@@ -52,8 +52,8 @@ interface FireMapProps {
 }
 
 const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSearch, dates, currentDate, onDateChange, searchParams, initialSettings, onSettingsChange, onViewportChange, onQuickRange }) => {
-  const firePoints = useMemo(() => fireCollection.features.map(f => f.properties as FirePoint), [fireCollection]);
-  const firePointsAll = useMemo(() => fullCollection.features.map(f => f.properties as FirePoint), [fullCollection]);
+  const firePoints = useMemo(() => (fireCollection?.features ?? []).map(f => f.properties as FirePoint), [fireCollection]);
+  const firePointsAll = useMemo(() => (fullCollection?.features ?? []).map(f => f.properties as FirePoint), [fullCollection]);
   const [showHeatmap, setShowHeatmap] = useState(initialSettings?.showHeatmap ?? true);
   const [showCluster, setShowCluster] = useState(initialSettings?.showCluster ?? true);
   const [showStats, setShowStats] = useState(initialSettings?.showStats ?? false);

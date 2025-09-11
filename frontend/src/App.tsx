@@ -4,7 +4,7 @@ import { SearchParams, FireFeatureCollection } from './types';
 import './App.css';
 import { useFiresQuery } from './hooks/useFiresQuery';
 import { eachDayOfInterval, format } from 'date-fns';
-import { decodeState, encodeState, LayerSettings, Viewport } from './utils/urlState';
+import { LayerSettings, Viewport } from './utils/urlState';
 
 const App: React.FC = () => {
   const [baseParams, setBaseParams] = useState<SearchParams | null>(null);
@@ -20,7 +20,9 @@ const App: React.FC = () => {
   const fullCollection: FireFeatureCollection = data ?? emptyFireCollection;
   const fireCollection: FireFeatureCollection = useMemo(() => {
     if (!currentDate) return fullCollection;
-    const filtered = fullCollection.features.filter(f => (f.properties as any)?.acq_date === currentDate);
+    const filtered = (fullCollection?.features ?? []).filter(
+      f => (f.properties as any)?.acq_date === currentDate
+    );
     return { type: 'FeatureCollection', features: filtered };
   }, [fullCollection, currentDate]);
 
@@ -31,57 +33,14 @@ const App: React.FC = () => {
     if (!currentDate || list.indexOf(currentDate) === -1) setCurrentDate(list[0]);
   };
 
-  // Hash -> state on load; fallback to localStorage when hash is absent
+  // Do not restore previous session (URL hash/localStorage disabled per request)
   useEffect(() => {
-    const st = decodeState(window.location.hash);
-    if (st) {
-      if (st.mode === 'country' && st.country && st.start && st.end) {
-        const params: SearchParams = { mode: 'country', country: st.country, startDate: st.start, endDate: st.end, format: 'geojson' };
-        setBaseParams(params);
-        computeDates(st.start, st.end);
-        if (st.current) setCurrentDate(st.current);
-      } else if (st.mode === 'bbox' && st.start && st.end && st.west !== undefined) {
-        const params: SearchParams = { mode: 'bbox', west: st.west!, south: st.south!, east: st.east!, north: st.north!, startDate: st.start, endDate: st.end, format: 'geojson' };
-        setBaseParams(params);
-        computeDates(st.start, st.end);
-        if (st.current) setCurrentDate(st.current);
-      }
-      if (st.layers) setLayerSettings(st.layers);
-      if (st.vp) setViewport(st.vp);
-    } else {
-      try {
-        const q = localStorage.getItem('firms:lastQuery');
-        if (q) {
-          const parsed = JSON.parse(q) as SearchParams;
-          setBaseParams(parsed);
-          computeDates(parsed.startDate, parsed.endDate);
-          const cd = localStorage.getItem('firms:lastCurrentDate');
-          if (cd) setCurrentDate(cd);
-        }
-        const ls = localStorage.getItem('firms:lastLayers');
-        if (ls) setLayerSettings(JSON.parse(ls));
-        const vp = localStorage.getItem('firms:lastViewport');
-        if (vp) setViewport(JSON.parse(vp));
-      } catch {}
-    }
+    // Intentionally left blank: start with a clean session each load
   }, []);
 
-  // Persist to hash whenever key state changes
+  // Disable persistence (URL hash/localStorage)
   useEffect(() => {
-    if (!baseParams) return;
-    const hash = encodeState({
-      mode: baseParams.mode,
-      country: baseParams.country,
-      west: baseParams.west, south: baseParams.south, east: baseParams.east, north: baseParams.north,
-      start: baseParams.startDate, end: baseParams.endDate, current: currentDate || undefined,
-      layers: layerSettings, vp: viewport,
-    });
-    if (hash) window.location.hash = hash;
-    // persist as fallback
-    try {
-      localStorage.setItem('firms:lastQuery', JSON.stringify(baseParams));
-      if (currentDate) localStorage.setItem('firms:lastCurrentDate', currentDate);
-    } catch {}
+    // no-op: do not write state on change
   }, [baseParams, currentDate, layerSettings, viewport]);
 
   const handleSearch = (params: SearchParams) => {
@@ -109,11 +68,9 @@ const App: React.FC = () => {
         initialSettings={layerSettings}
         onSettingsChange={(s) => {
           setLayerSettings(s);
-          try { localStorage.setItem('firms:lastLayers', JSON.stringify(s)); } catch {}
         }}
         onViewportChange={(vp) => {
           setViewport(vp);
-          try { localStorage.setItem('firms:lastViewport', JSON.stringify(vp)); } catch {}
         }}
         onQuickRange={(token) => {
           // quick range recompute

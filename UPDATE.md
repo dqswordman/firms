@@ -102,3 +102,22 @@ This document records notable changes applied to the project by the agent.
   - TODOs: Marked measure stabilization complete; follow-ups left for Undo and multi-record export.
 
 
+## 2025-09-11
+
+- Frontend
+  - Fixed crash on initial load: guarded feature filtering in `frontend/src/App.tsx:useMemo` to tolerate undefined collections.
+  - Disabled session restore per request: removed reading/writing of URL hash and localStorage. New sessions start clean without showing the last query.
+  - Stopped persisting layer settings and viewport in `App.tsx` callbacks.
+  - Hardened `FireMap` to guard `.features.map` when building point arrays.
+  - Validated fetch shape in `useFiresQuery`: if backend returns `[]` while `format=geojson`, coerce to an empty FeatureCollection to avoid runtime errors.
+
+- Docs
+  - Updated `todo list.md` Must AC to note persistence disabled; added a completed item for disabling session restore.
+
+- Validation
+  - Ran `cd frontend && npx tsc -p tsconfig.json --noEmit` successfully.
+  - Ensured backend returns a consistent type for early returns.
+
+- Backend
+  - `GET /fires`: when query cannot be prepared (no data availability or invalid inputs), now returns an empty GeoJSON FeatureCollection if `format=geojson`, aligning response shape with frontend expectations.
+  - Detect invalid MAP keys: `data_availability` and data fetch now check for FIRMS plain-text errors (e.g., "Invalid MAP_KEY.") and return 503 with guidance instead of silently returning empty results.

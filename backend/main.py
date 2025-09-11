@@ -168,7 +168,13 @@ async def _fetch_firms_data_async(
                 "firms_request",
                 extra={"url": url, "status_code": resp.status_code, "retries": attempt - 1},
             )
-            reader = csv.DictReader(io.StringIO(resp.text))
+            text = resp.text
+            lower_head = " ".join(text.splitlines()[:2]).lower()
+            if "invalid map_key" in lower_head or "invalid api call" in lower_head or "unauthorized" in lower_head:
+                raise HTTPExceptionFactory.service_unavailable(
+                    "Invalid or unauthorized FIRMS MAP_KEY (data fetch). Please update backend/.env"
+                )
+            reader = csv.DictReader(io.StringIO(text))
             transformed_data = []
             for row in reader:
                 if not any(row.values()):
@@ -341,7 +347,13 @@ def _prepare_fire_query(
         if source_priority
         else DEFAULT_SOURCE_PRIORITY
     )
-    availability = check_data_availability(MAP_KEY, "ALL")
+    try:
+        availability = check_data_availability(MAP_KEY, "ALL")
+    except Exception as e:
+        raise HTTPExceptionFactory.service_unavailable(
+            "Invalid or unauthorized FIRMS MAP_KEY. Please update backend/.env",
+            details=str(e),
+        )
     selected_source: Optional[str] = None
     for src in priorities:
         if src not in SOURCE_WHITELIST or src not in availability:
@@ -452,7 +464,8 @@ async def get_fires(
         response,
     )
     if not prepared:
-        return []
+        # Honor requested format even in early-return path
+        return to_geojson([]) if format == "geojson" else []
     urls, selected_source = prepared
 
     if "application/x-ndjson" in request.headers.get("accept", ""):

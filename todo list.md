@@ -4,13 +4,16 @@ This list tracks UI work toward parity with NASA FIRMS (MoSCoW priority).
 
 ## Must
 - Layer panel groups and toggles (Fires / Overlays / Backgrounds / Analytics)
-  - AC: Collapsible groups; instant effect; URL hash persistence; restore from hash/localStorage
+  - AC: Collapsible groups; instant effect. [Updated: persistence disabled per request]
 - Time slider (bottom)
   - AC: Quick ranges Today/24H/48H/7D/WEEK; month ticks; current-day highlight; range selection (dual handles); adaptive tick density
 - Mouse coordinates and scale bar
   - AC: Coordinates centered at top; scale at bottom-left; consistent with projection
 - One-shot range loading + client-side filtering
   - AC: Fetch once per selected range; filter per-day by `acq_date`
+
+- Disable session restore [Done]
+  - AC: On fresh load, do not restore previous query, layers, or viewport; do not read/write URL hash or localStorage.
 
 ## Should
 - Bottom toolbar buttons
