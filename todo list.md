@@ -8,7 +8,7 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
   - AC: FastAPI modular layout (pp/api, pp/services, pp/clients, pp/core, pp/schemas)
   - AC: GitHub Actions workflow running lint + unit tests
 - Stage 2: Data & API layer
-  - AC: FIRMS client with retries/cache + unified error model
+  - [x] AC: FIRMS client with retries/cache + unified error model
   - AC: /fires & /fires/stats rewritten with typed responses and tests (mock FIRMS)
   - AC: Frontend query service (Axios + TanStack Query) covering retries/toasts
 - Stage 3: Map core reimplementation
@@ -36,3 +36,6 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
 - 2025-09-12: Rebuild plan approved; documentation updated (AGENTS/README/todo).
 - 2025-09-23: Stage 1 scaffolds created (frontend-vite skeleton, backend/app modular layout).
 - 2025-09-24: Stage 2 underway (FIRMS client/service modules scaffolded, CI+Prettier/Vitest baseline).
+- 2025-09-25: Stage 2 moving into API replacement (new /api/fires + stats, pytest passing)
+- 2025-09-25: Stage 3 map core scaffolding (Zustand store + React-Leaflet shell).
+

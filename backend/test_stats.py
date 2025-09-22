@@ -34,7 +34,7 @@ def test_stats_endpoint(monkeypatch):
         {"frp": "3", "daynight": "D", "confidence": "l", "satellite": "A"},
     ]
 
-    async def fake_fetch(urls, selected_source):
+    async def fake_fetch(urls, selected_source, *args, **kwargs):
         return sample
 
     def fake_prepare(*args, **kwargs):

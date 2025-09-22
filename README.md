@@ -70,6 +70,13 @@ uvicorn main:app --reload
 - Configuration via `app/core/config.py` (`pydantic-settings`); ensure `pydantic-settings` installed from `requirements.txt`.
 - Legacy `backend/main.py` remains active until Stage 2 migrates existing routes.
 - `.env.example` contains placeholders for FIRMS credentials; copy to `backend/.env` before running.
+- Stage 2 adds `frontend-vite/src/services` and `src/queries` for Axios + TanStack Query integration against the new `/api/fires` endpoints. Set `VITE_API_BASE_URL` in `frontend-vite/.env` as needed.
+
+### Stage 3 (in progress)
+
+- `frontend-vite/src/features/map/MapView.tsx` renders a React-Leaflet map backed by Zustand store state.
+- `frontend-vite/src/stores/mapStore.ts` centralises viewport/baseLayer/query params for upcoming map features.
+- `frontend-vite/src/index.css` defines the app shell layout; map output currently uses default OpenStreetMap tiles.
 
 Endpoints:
 - `GET /fires` - Returns GeoJSON (default) or JSON fire records. Query params include `country` or `west/south/east/north`, `start_date`, `end_date`, optional `sourcePriority`, `format` (`json|geojson`), and `maxConcurrency`.
@@ -100,7 +107,9 @@ Visit http://localhost:3000 and search by ISO3 or bounding box. The legacy clien
   - `cd frontend-vite && npm run test`
   - `cd frontend-vite && npm run build`
   - `cd frontend-vite && npm run format` (check) / `npm run format:write`
-- Backend syntax: `python -m py_compile backend/main.py`
+- Backend:
+  - Syntax check: `python -m py_compile backend/main.py`
+  - Modular services: `cd backend && pytest`
 - Upcoming: Stage 2 will introduce pytest suites for backend routes.
 
 ## Map & UI Notes

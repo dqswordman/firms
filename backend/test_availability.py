@@ -41,6 +41,7 @@ def test_fallback_to_sp(monkeypatch):
             "start_date": "2024-02-01",
             "end_date": "2024-02-02",
             "sourcePriority": "VIIRS_SNPP_NRT,VIIRS_SNPP_SP",
+            "format": "json",
         },
     )
 
@@ -74,6 +75,7 @@ def test_no_source_available(monkeypatch):
             "start_date": "2024-02-01",
             "end_date": "2024-02-02",
             "sourcePriority": "VIIRS_SNPP_NRT,VIIRS_SNPP_SP",
+            "format": "json",
         },
     )
 
