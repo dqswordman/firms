@@ -3,7 +3,7 @@
 This list tracks the full-system rebuild toward Stage 1-5 delivery.
 
 ## Must
-- Stage 1: Framework scaffolding
+- [x] Stage 1: Framework scaffolding
   - AC: Vite + React + Zustand skeleton committed under rontend/ with lint/test tooling
   - AC: FastAPI modular layout (pp/api, pp/services, pp/clients, pp/core, pp/schemas)
   - AC: GitHub Actions workflow running lint + unit tests
@@ -35,3 +35,4 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
 ## Progress Updates
 - 2025-09-12: Rebuild plan approved; documentation updated (AGENTS/README/todo).
 - 2025-09-23: Stage 1 scaffolds created (frontend-vite skeleton, backend/app modular layout).
+- 2025-09-24: Stage 2 underway (FIRMS client/service modules scaffolded, CI+Prettier/Vitest baseline).

@@ -69,6 +69,7 @@ uvicorn main:app --reload
 - New modular entrypoint: `backend/app/main.py` (FastAPI app factory with `/api` router placeholder).
 - Configuration via `app/core/config.py` (`pydantic-settings`); ensure `pydantic-settings` installed from `requirements.txt`.
 - Legacy `backend/main.py` remains active until Stage 2 migrates existing routes.
+- `.env.example` contains placeholders for FIRMS credentials; copy to `backend/.env` before running.
 
 Endpoints:
 - `GET /fires` - Returns GeoJSON (default) or JSON fire records. Query params include `country` or `west/south/east/north`, `start_date`, `end_date`, optional `sourcePriority`, `format` (`json|geojson`), and `maxConcurrency`.
@@ -93,10 +94,14 @@ npm start
 Visit http://localhost:3000 and search by ISO3 or bounding box. The legacy client still auto-fits once results arrive; Stage 3 will introduce a new auto-fit hook without the current snap-back issues.
 
 ## Validation & Tooling
-- TypeScript: `cd frontend && npx tsc -p tsconfig.json --noEmit`
+- Legacy frontend: `cd frontend && npx tsc -p tsconfig.json --noEmit`
+- Stage 1 frontend scaffold:
+  - `cd frontend-vite && npm run lint`
+  - `cd frontend-vite && npm run test`
+  - `cd frontend-vite && npm run build`
+  - `cd frontend-vite && npm run format` (check) / `npm run format:write`
 - Backend syntax: `python -m py_compile backend/main.py`
-- Optional: `npm test` for React tests, `pytest` (once implemented) for backend.
-- Upcoming: Stage 1 will add Vitest + React Testing Library, pytest suites, and GitHub Actions; commands will be documented here once landed.
+- Upcoming: Stage 2 will introduce pytest suites for backend routes.
 
 ## Map & UI Notes
 - **Layer panel**: Fires / Overlays / Backgrounds / Analytics are collapsible. LAYERS button scrolls and highlights the control card.
