@@ -4,7 +4,8 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
 
 ## Must
 - [x] Stage 1: Framework scaffolding
-  - AC: Vite + React + Zustand skeleton committed under rontend/ with lint/test tooling
+  - AC: Vite + React + Zustand skeleton committed under 
+rontend/ with lint/test tooling
   - AC: FastAPI modular layout (pp/api, pp/services, pp/clients, pp/core, pp/schemas)
   - AC: GitHub Actions workflow running lint + unit tests
 - Stage 2: Data & API layer
@@ -12,8 +13,8 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
   - AC: /fires & /fires/stats rewritten with typed responses and tests (mock FIRMS)
   - AC: Frontend query service (Axios + TanStack Query) covering retries/toasts
 - Stage 3: Map core reimplementation
-  - AC: Hooks useMapInteractions, useMeasureTool, useAutoFit; Zustand store for map state
-  - AC: Measurement tool detach from map locking; automated tests (unit + e2e scenario)
+  - [x] AC: Hooks useMapInteractions, useMeasureTool, useAutoFit; Zustand store for map state
+  - AC: Measurement tool detach from map locking; automated tests (unit + e2e scenario) [unit covered, e2e pending]
 - Stage 4: Feature migration
   - AC: Time slider, filters, analytics, search form migrated to new architecture with URL sync
   - AC: Optional localisation scaffolding prepared
@@ -38,4 +39,5 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
 - 2025-09-24: Stage 2 underway (FIRMS client/service modules scaffolded, CI+Prettier/Vitest baseline).
 - 2025-09-25: Stage 2 moving into API replacement (new /api/fires + stats, pytest passing)
 - 2025-09-25: Stage 3 map core scaffolding (Zustand store + React-Leaflet shell).
+- 2025-09-26: Stage 3 map interaction hooks and measurement state refactor (unit coverage; e2e planned)
 

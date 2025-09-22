@@ -1,5 +1,14 @@
 ﻿# Update Log
 
+## 2025-09-26
+
+- Frontend
+  - Extended `frontend-vite/src/stores/mapStore.ts` to manage measurement state, interaction toggles, and queued auto-fit bounds with distance/area calculations.
+  - Added dedicated map hooks (`useMapInteractions`, `useMeasureTool`, `useAutoFit`) under `frontend-vite/src/features/map/hooks/` and wired them into `MapView`.
+  - Introduced map interaction styling cues in `frontend-vite/src/index.css` and refreshed unit tests (`src/__tests__/mapStore.test.ts`) for measurement flow and auto-fit requests.
+- Docs
+  - Documented the new map hooks and measurement coverage in `README.md` and updated `todo list.md` Stage 3 status plus progress log.
+
 This document records notable changes applied to the project by the agent.
 
 ## 2025-09-12
