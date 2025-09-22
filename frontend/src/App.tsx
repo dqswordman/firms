@@ -12,6 +12,7 @@ const App: React.FC = () => {
   const [dates, setDates] = useState<string[]>([]);
   const [layerSettings, setLayerSettings] = useState<LayerSettings | undefined>(undefined);
   const [viewport, setViewport] = useState<Viewport>({});
+  const [autoFitVersion, setAutoFitVersion] = useState(0);
 
   // Fetch once for the entire range; filter client-side by currentDate
   const queryParams = baseParams ? baseParams : undefined;
@@ -49,6 +50,7 @@ const App: React.FC = () => {
       .map(d => format(d, 'yyyy-MM-dd'));
     setDates(allDates);
     setCurrentDate(params.startDate);
+    setAutoFitVersion(v => v + 1);
   };
 
   const handleDateChange = (date: string) => {
@@ -72,6 +74,7 @@ const App: React.FC = () => {
         onViewportChange={(vp) => {
           setViewport(vp);
         }}
+        autoFitVersion={autoFitVersion}
         onQuickRange={(token) => {
           // quick range recompute
           const today = new Date();
@@ -94,6 +97,7 @@ const App: React.FC = () => {
             const days = eachDayOfInterval({ start: new Date(start), end: new Date(end) }).map(d => fmt(d));
             setDates(days);
             setCurrentDate(days[days.length - 1]);
+            setAutoFitVersion(v => v + 1);
           }
         }}
       />

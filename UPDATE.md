@@ -2,6 +2,26 @@
 
 This document records notable changes applied to the project by the agent.
 
+## 2025-09-12
+
+- Backend
+  - Cached FIRMS data availability metadata with a 10 minute TTL and protected access via a threading lock.
+  - Moved availability lookups off the event loop using `asyncio.to_thread`, passing resolved datasets into `_prepare_fire_query` to keep handlers non-blocking.
+  - Stage 1 scaffolding: added `backend/app/` modular layout (`api`, `services`, `clients`, `core`, `schemas`) with placeholder app factory and health probe; updated requirements for `pydantic-settings`.
+- Frontend
+  - Normalised FRP/Brightness sliders to share metric extraction logic; clamped thresholds when the available range shrinks.
+  - Hardened `useFiresQuery` to accept numeric or string latitude/longitude values and ignore malformed points.
+  - Auto-fit the map to new results (or bbox fallback) via `AutoViewport`, keyed to query signatures so manual zoom stays put while keeping a single `ScaleControl`.
+  - Restored map interactions after measurement sessions by centralising the lock/unlock logic; pan toggles no longer leave the map frozen.
+  - Swapped garbled Trend error toast for a clear English message.
+  - Stage 1 kickoff: scaffolded `frontend-vite/` (Vite + React + Zustand + TanStack Query) with placeholder App and store.
+- Docs
+  - Replaced `AGENTS.md` with rebuild playbook outlining staged roadmap and operating rules.
+  - Updated `README.md` to document the staged rebuild plan alongside legacy setup instructions.
+  - Reset `todo list.md` to stage-based MoSCoW tracking for the full refactor.
+- Housekeeping
+  - Recorded new behaviour in `UPDATE.md` and maintained ASCII-only docs.
+
 ## 2025-08-31
 
 - Backend

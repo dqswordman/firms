@@ -304,6 +304,7 @@ def _prepare_fire_query(
     end_date: Optional[str],
     source_priority: Optional[str],
     response: Response,
+    availability: Dict[str, Tuple[str, str]],
 ) -> Optional[Tuple[List[str], str]]:
     """Validate parameters and compose request URLs."""
     requested_country_mode = False
@@ -347,13 +348,6 @@ def _prepare_fire_query(
         if source_priority
         else DEFAULT_SOURCE_PRIORITY
     )
-    try:
-        availability = check_data_availability(MAP_KEY, "ALL")
-    except Exception as e:
-        raise HTTPExceptionFactory.service_unavailable(
-            "Invalid or unauthorized FIRMS MAP_KEY. Please update backend/.env",
-            details=str(e),
-        )
     selected_source: Optional[str] = None
     for src in priorities:
         if src not in SOURCE_WHITELIST or src not in availability:
@@ -452,6 +446,14 @@ async def get_fires(
     if not MAP_KEY:
         raise HTTPExceptionFactory.service_unavailable("FIRMS_MAP_KEY is not configured on the server")
 
+    try:
+        availability = await asyncio.to_thread(check_data_availability, MAP_KEY, "ALL")
+    except Exception as e:
+        raise HTTPExceptionFactory.service_unavailable(
+            "Invalid or unauthorized FIRMS MAP_KEY. Please update backend/.env",
+            details=str(e),
+        )
+
     prepared = _prepare_fire_query(
         country,
         west,
@@ -462,6 +464,7 @@ async def get_fires(
         end_date,
         source_priority,
         response,
+        availability,
     )
     if not prepared:
         # Honor requested format even in early-return path
@@ -518,6 +521,14 @@ async def get_fire_stats(
     if not MAP_KEY:
         raise HTTPExceptionFactory.service_unavailable("FIRMS_MAP_KEY is not configured on the server")
 
+    try:
+        availability = await asyncio.to_thread(check_data_availability, MAP_KEY, "ALL")
+    except Exception as e:
+        raise HTTPExceptionFactory.service_unavailable(
+            "Invalid or unauthorized FIRMS MAP_KEY. Please update backend/.env",
+            details=str(e),
+        )
+
     prepared = _prepare_fire_query(
         country,
         west,
@@ -528,6 +539,7 @@ async def get_fire_stats(
         end_date,
         source_priority,
         response,
+        availability,
     )
     data: List[Dict] = []
     if prepared:

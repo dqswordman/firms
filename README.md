@@ -1,126 +1,124 @@
-﻿# FIRMS Wildfire Data Visualization System
+# FIRMS Wildfire Explorer
 
-A global wildfire data visualization system based on NASA FIRMS API, supporting country/bbox queries and time series visualization.
+> **Status**: Legacy codebase under full rebuild. This README tracks both the current production behaviour and the staged roadmap (Stage 1-5) that will deliver the new architecture.
 
-## Features
+The application delivers a NASA FIRMS inspired wildfire intelligence workspace with single-range data fetching, map visualisation, analytics, and sharing. During the rebuild we will retain all user-facing features while progressively migrating to a modern, modular stack.
 
-- Global wildfire visualization with an interactive map
-- Country or bbox-based queries with strict date validation (<= 10 days, end <= today)
-- One-shot range fetch; client-side day filtering via time slider
-- Multiple visualization layers:
-  - Heatmap
-  - Clusters
-  - Overlays: Country Outline, Graticule, Street Ref
-  - Analytics: Statistics / Trend / Radar
-- Responsive UI with MUI and Tailwind CSS
+## Rebuild Roadmap
 
-## Quick Start
+| Stage | Scope | Key Deliverables |
+|-------|-------|------------------|
+| 1 | Framework | Vite + React + Zustand skeleton, FastAPI modular layout, CI (lint+test), baseline tests |
+| 2 | Data & APIs | Rewritten `/fires` & `/fires/stats`, FIRMS client with caching/retries, unified query service |
+| 3 | Map Core | Hooks for map/measure/auto-fit, Zustand-driven state, removal of legacy side-effects |
+| 4 | Feature Migration | Time slider, filters, analytics, search, URL sync, optional i18n |
+| 5 | Ops & Acceptance | E2E tests, Docker/Nginx, deployment scripts, final documentation & changelog |
 
-### Start Backend
-1) `cd backend`
-2) Create and activate venv
-   - Windows: `python -m venv venv && .\venv\Scripts\activate`
-   - macOS/Linux: `python -m venv venv && source venv/bin/activate`
-3) Install deps: `pip install -r requirements.txt`
-4) Create `backend/.env`
+Each stage must ship a running build, updated documentation, and automated tests. `UPDATE.md` records stage milestones chronologically.
+
+## Feature Highlights (legacy baseline)
+- **NASA-style map shell** with auto-fit viewport, grouped layer controls, and dark glass UI treatment.
+- **One-shot range loading**: the backend proxy de-duplicates FIRMS CSV data while the frontend filters by day on the client.
+- **Layer groups & analytics**: heatmap, clusters, overlays, basemap selector, plus Statistics / Trend / Radar analysis tabs.
+- **Range-aware time slider** with Today/24H/48H/7D/WEEK shortcuts, dual-handle range selection, and adaptive tick density.
+- **Measurement suite** supporting distance and area, multiple unit systems, pan mode, and Clear/ESC guards.
+- **Robust filtering**: FRP/Brightness thresholds now share the same scale across heatmap, clusters, and analytics.
+
+## Architecture Overview
+
+> This section describes the legacy stack currently in production. Stage 1 will introduce a Vite + React + Zustand frontend and a modular FastAPI backend layout; the table will be updated alongside that change.
+
+| Layer    | Stack & Responsibilities |
+|---------|--------------------------|
+| Frontend | React 18, TypeScript, react-leaflet, Tailwind, MUI. Handles UI state, client-side filtering, timelines, analytics, and measurement tooling. |
+| Backend  | FastAPI, httpx, requests, python-dotenv. Proxies FIRMS area CSV endpoints, validates ISO3/bbox, caches dataset availability, and normalises GeoJSON output. |
+
+### Data Flow
+1. The frontend issues a single `/fires` request for the selected range (country or bbox).
+2. The backend validates the request, resolves the best dataset via cached data availability metadata (10 minute TTL), fetches matching CSV segments concurrently, and de-duplicates rows.
+3. Responses return either GeoJSON or JSON; the frontend hydrates the FeatureCollection and filters per day/time slider.
+4. Trend analytics request JSON form of the same range to avoid re-fetching per interaction when cached data is unavailable.
+
+## Prerequisites
+- Node.js 18+
+- npm 9+
+- Python 3.11+
+- FIRMS MAP key with area CSV permissions
+
+## Backend Setup (legacy)
+```bash
+cd backend
+python -m venv .venv
+. .venv/Scripts/activate    # Windows PowerShell: .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Create `backend/.env`:
 ```
 FIRMS_MAP_KEY=your_map_key_here
 ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
-5) Run: `uvicorn main:app --reload`
 
-The backend uses NASA FIRMS v4 endpoints and supports `sourcePriority` to control dataset selection.
+Run the API:
+```bash
+uvicorn main:app --reload
+```
 
-Note on API keys:
-- FIRMS returns HTTP 200 with plain text like "Invalid MAP_KEY." for bad keys. The backend now detects this and responds 503 with a clear error. If you see empty results, verify your key.
-- Obtain a valid FIRMS API Map Key from the FIRMS portal (Manage API keys). Replace `FIRMS_MAP_KEY` and restart the backend.
+### Stage 1 scaffolding (in progress)
 
-### Start Frontend
-1) `cd frontend`
-2) `npm install`
-3) Create `frontend/.env`
+- New modular entrypoint: `backend/app/main.py` (FastAPI app factory with `/api` router placeholder).
+- Configuration via `app/core/config.py` (`pydantic-settings`); ensure `pydantic-settings` installed from `requirements.txt`.
+- Legacy `backend/main.py` remains active until Stage 2 migrates existing routes.
+
+Endpoints:
+- `GET /fires` - Returns GeoJSON (default) or JSON fire records. Query params include `country` or `west/south/east/north`, `start_date`, `end_date`, optional `sourcePriority`, `format` (`json|geojson`), and `maxConcurrency`.
+- `GET /fires/stats` - Aggregated FRP buckets, day/night counts, confidence, and satellite distribution using the same query contract.
+- `GET /health` - Liveness probe.
+
+## Frontend Setup (legacy)
+```bash
+cd frontend
+npm install
+```
+
+Create `frontend/.env`:
 ```
 REACT_APP_API_URL=http://localhost:8000
 ```
-4) `npm start` and open http://localhost:3000
 
-## UI Overview (NASA style)
+Start the UI:
+```bash
+npm start
+```
+Visit http://localhost:3000 and search by ISO3 or bounding box. The legacy client still auto-fits once results arrive; Stage 3 will introduce a new auto-fit hook without the current snap-back issues.
 
-- Top bar: dark translucent header with current date
-- Left panel: Query card (Country/BBox, Date Range, Dataset, Format)
-- Right panel: grouped sections (Fires / Overlays / Backgrounds / Analytics)
-  - Analytics tabs: Statistics / Trend / Radar
-  - Settings do not persist across sessions (URL hash/localStorage disabled)
-  - Fires section includes optional Filter (FRP/Brightness) applied to map layers
-- Bottom: Time slider with quick ranges (Today / 24H / 48H / 7D / WEEK)
-  - Shows month ticks and highlights the current date
-  - Toolbar actions: Measure (distance/area) and Help
-- Note: The Location action has been removed
-- Note: Legend panel is temporarily removed to avoid dropdown overlap (Trend/Radar, Select poppers)
+## Validation & Tooling
+- TypeScript: `cd frontend && npx tsc -p tsconfig.json --noEmit`
+- Backend syntax: `python -m py_compile backend/main.py`
+- Optional: `npm test` for React tests, `pytest` (once implemented) for backend.
+- Upcoming: Stage 1 will add Vitest + React Testing Library, pytest suites, and GitHub Actions; commands will be documented here once landed.
 
-## Usage Guide
+## Map & UI Notes
+- **Layer panel**: Fires / Overlays / Backgrounds / Analytics are collapsible. LAYERS button scrolls and highlights the control card.
+- **Filters**: FRP and Brightness sliders share metric ranges; enabling "Apply to Analytics" keeps Statistics/Trend/Radar aligned.
+- **Auto viewport**: Every new query fits the map to returned features (or bbox fallback) before user adjustments.
+- **Timeline**: dual slider keeps current-day highlight; quick range buttons recompute date ranges without re-querying.
+- **Measurement**: Distance/Area with km/mi/m and km²/mi²/ha, per-segment labels, ESC cancel, Pan toggle, Clear reset.
 
-## Frontend Data Fetching Strategy
-
-- Use TanStack Query to manage wildfire data requests
-- Cache key: (mode, source, country|bbox, startDate, endDate, format)
-- Fetch once for the selected date range; filter by acq_date locally via the time slider
-- Use exponential backoff on failures; inspect cache with React Query Devtools
-
-## Measure (Overview)
-- Modes: Distance / Area
-- Units: km / mi / m; km² / mi² / ha
-- Interaction: click to add points; double-click to finish; ESC cancels; Clear removes all; Pan pauses drawing to pan the map
-- Display:
-  - Distance: per-segment labels (midpoints) and Total at the end
-  - Area: when polygon has 3+ points, Area shown near center
-- UI: a "MEASURE TOOL" card shows Mode, Units, Pan, Clear
-Implementation: frontend/src/components/FireMap.tsx (MeasureLayerPro)
-
-## Changelog
-
-Latest changes are recorded in `UPDATE.md`.
-
-## Technology Stack
-
-### Frontend
-- React 18, TypeScript
-- Leaflet + react-leaflet + leaflet.markercluster
-- Chart.js + react-chartjs-2
-- Tailwind CSS, date-fns, MUI
-
-### Backend
-- FastAPI, uvicorn
-- requests, python-dotenv
+## Backend Behaviour
+- Data availability metadata is cached per MAP key + sensor for 600 seconds to avoid redundant FIRMS calls.
+- Availability lookups now execute in a background thread (`asyncio.to_thread`) so request handlers remain responsive.
+- Invalid MAP keys raise HTTP 503 with detailed guidance.
+- CSV ingestion de-duplicates points using `(acq_date, acq_time, lat, lon, source)` key and normalises property names (brightness, confidence, FRP, etc.).
 
 ## Troubleshooting
+- **Invalid MAP key**: `/fires` returns 503 with `Invalid ... MAP_KEY`. Regenerate the key and update `backend/.env`.
+- **Empty response**: verify the requested dataset covers the date range (max 10 days) and the bbox is correct. The response will include `X-Data-Availability` when the dataset has no coverage.
+- **CORS errors**: ensure the frontend origin is listed in `ALLOWED_ORIGINS`.
+- **Frontend build issues**: clear node modules (`rm -rf node_modules && npm install`) and re-run TypeScript check.
 
-- 503 Service Unavailable: ensure `FIRMS_MAP_KEY` exists and restart backend
-- 400 Bad Request: check ISO3/bbox; date span <= 10 days; end date <= today
-- 429 Too Many Requests: FIRMS quota exceeded; wait or reduce request size
-- CORS blocked: include frontend origin in `ALLOWED_ORIGINS`
-
-## Development Docs
-
-See `AGENTS.md` for engineering workflow and conventions.
-
-## Contributing
-
-Issues and PRs are welcome.
+## Change Log
+See [`UPDATE.md`](UPDATE.md) for reverse-chronological agent summaries.
 
 ## License
-
 MIT License
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, ScaleControl, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -49,9 +49,10 @@ interface FireMapProps {
   onSettingsChange?: (s: any) => void;
   onViewportChange?: (vp: { lat: number; lng: number; zoom: number }) => void;
   onQuickRange?: (token: 'today' | '24h' | '48h' | '7d' | 'week') => void;
+  autoFitVersion?: number;
 }
 
-const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSearch, dates, currentDate, onDateChange, searchParams, initialSettings, onSettingsChange, onViewportChange, onQuickRange }) => {
+const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSearch, dates, currentDate, onDateChange, searchParams, initialSettings, onSettingsChange, onViewportChange, onQuickRange, autoFitVersion }) => {
   const firePoints = useMemo(() => (fireCollection?.features ?? []).map(f => f.properties as FirePoint), [fireCollection]);
   const firePointsAll = useMemo(() => (fullCollection?.features ?? []).map(f => f.properties as FirePoint), [fullCollection]);
   const [showHeatmap, setShowHeatmap] = useState(initialSettings?.showHeatmap ?? true);
@@ -80,36 +81,68 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
   const [measureClearToken, setMeasureClearToken] = useState(0);
   const controlsRef = React.useRef<HTMLDivElement | null>(null);
   const [highlightLayers, setHighlightLayers] = useState(false);
-  const maxWeight = useMemo(() => {
-    const values = firePoints.map(p => {
-      if (weightBy === 'frp') {
-        const raw = p.frp as any;
-        return typeof raw === 'number' ? raw : parseFloat(raw || '0');
+  const toNumber = React.useCallback((value: unknown): number => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : NaN;
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : NaN;
+    }
+    return NaN;
+  }, []);
+
+  const getMetricValue = React.useCallback(
+    (point: Partial<FirePoint>, metric: 'frp' | 'brightness'): number => {
+      if (metric === 'frp') {
+        return toNumber(point.frp);
       }
-      const b = (p as any).brightness as any;
-      if (typeof b === 'number') return b;
-      return parseFloat(p.bright_ti4 || '0');
-    }).filter(v => !isNaN(v));
+      const normalized = toNumber((point as any).brightness);
+      if (Number.isFinite(normalized)) return normalized;
+      const ti4 = toNumber(point.bright_ti4);
+      if (Number.isFinite(ti4)) return ti4;
+      const ti5 = toNumber(point.bright_ti5);
+      if (Number.isFinite(ti5)) return ti5;
+      return NaN;
+    },
+    [toNumber]
+  );
+
+  const weightMax = useMemo(() => {
+    const values = firePoints
+      .map((p) => getMetricValue(p, weightBy))
+      .filter((value) => Number.isFinite(value));
     return values.length > 0 ? Math.max(...values) : 0;
-  }, [firePoints, weightBy]);
+  }, [firePoints, getMetricValue, weightBy]);
+
+  const filterMax = useMemo(() => {
+    const values = firePoints
+      .map((p) => getMetricValue(p, filterBy))
+      .filter((value) => Number.isFinite(value));
+    return values.length > 0 ? Math.max(...values) : 0;
+  }, [firePoints, filterBy, getMetricValue]);
+
+  useEffect(() => {
+    if (threshold > weightMax) {
+      setThreshold(weightMax);
+    }
+  }, [threshold, weightMax]);
+
+  useEffect(() => {
+    if (filterThreshold > filterMax) {
+      setFilterThreshold(filterMax);
+    }
+  }, [filterThreshold, filterMax]);
 
   // Apply optional filter to displayed features (map only)
   const displayCollection: FireFeatureCollection = useMemo(() => {
     if (!filterEnabled) return fireCollection;
-    const features = fireCollection.features.filter(f => {
-      const props: any = f.properties;
-      if (filterBy === 'frp') {
-        const raw = props.frp;
-        const val = typeof raw === 'number' ? raw : parseFloat(raw || '0');
-        return !isNaN(val) && val >= filterThreshold;
-      } else {
-        const b = props.brightness as any;
-        const val = typeof b === 'number' ? b : parseFloat(props.bright_ti4 || '0');
-        return !isNaN(val) && val >= filterThreshold;
-      }
+    const features = fireCollection.features.filter((feature) => {
+      const value = getMetricValue(feature.properties as FirePoint, filterBy);
+      return Number.isFinite(value) && value >= filterThreshold;
     });
-    return { type: 'FeatureCollection', features } as FireFeatureCollection;
-  }, [fireCollection, filterEnabled, filterBy, filterThreshold]);
+    return { ...fireCollection, features };
+  }, [fireCollection, filterEnabled, filterBy, filterThreshold, getMetricValue]);
 
   // propagate settings to parent (guarded against callback identity churn)
   const prevSettingsJsonRef = React.useRef<string>("{}");
@@ -141,33 +174,19 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
   // Analytics data (optionally filtered by the same criteria)
   const analyticsDayPoints: FirePoint[] = useMemo(() => {
     if (!filterEnabled || !filterAffectsAnalytics) return firePoints;
-    return firePoints.filter((p: any) => {
-      if (filterBy === 'frp') {
-        const raw = p.frp;
-        const val = typeof raw === 'number' ? raw : parseFloat(raw || '0');
-        return !isNaN(val) && val >= filterThreshold;
-      } else {
-        const b: any = p.brightness;
-        const val = typeof b === 'number' ? b : parseFloat(p.bright_ti4 || '0');
-        return !isNaN(val) && val >= filterThreshold;
-      }
+    return firePoints.filter((point) => {
+      const value = getMetricValue(point, filterBy);
+      return Number.isFinite(value) && value >= filterThreshold;
     });
-  }, [firePoints, filterEnabled, filterAffectsAnalytics, filterBy, filterThreshold]);
+  }, [firePoints, filterEnabled, filterAffectsAnalytics, filterBy, filterThreshold, getMetricValue]);
 
   const analyticsAllPoints: FirePoint[] = useMemo(() => {
     if (!filterEnabled || !filterAffectsAnalytics) return firePointsAll;
-    return firePointsAll.filter((p: any) => {
-      if (filterBy === 'frp') {
-        const raw = p.frp;
-        const val = typeof raw === 'number' ? raw : parseFloat(raw || '0');
-        return !isNaN(val) && val >= filterThreshold;
-      } else {
-        const b: any = p.brightness;
-        const val = typeof b === 'number' ? b : parseFloat(p.bright_ti4 || '0');
-        return !isNaN(val) && val >= filterThreshold;
-      }
+    return firePointsAll.filter((point) => {
+      const value = getMetricValue(point, filterBy);
+      return Number.isFinite(value) && value >= filterThreshold;
     });
-  }, [firePointsAll, filterEnabled, filterAffectsAnalytics, filterBy, filterThreshold]);
+  }, [firePointsAll, filterEnabled, filterAffectsAnalytics, filterBy, filterThreshold, getMetricValue]);
 
   const renderVisualizationControls = () => (
     <Box sx={{ position: 'absolute', top: 16, right: 16, zIndex: 1200, pointerEvents: 'auto' }}>
@@ -200,7 +219,7 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
                   </Select>
                 </FormControl>
                 <Typography variant="caption" color="text.secondary">Threshold: {threshold.toFixed(0)}</Typography>
-                <MUISlider size="small" min={0} max={Math.max(maxWeight, 1)} value={threshold} onChange={(_, v) => setThreshold(v as number)} />
+                <MUISlider size="small" min={0} max={Math.max(weightMax, 1)} value={threshold} onChange={(_, v) => setThreshold(v as number)} />
               </Box>
             )}
             <FormControlLabel control={<Switch checked={showCluster} onChange={(e) => setShowCluster(e.target.checked)} />} label="Clusters" />
@@ -229,7 +248,7 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
                   </Select>
                 </FormControl>
                 <Typography variant="caption" color="text.secondary">Min {filterBy.toUpperCase()}: {filterThreshold.toFixed(0)}</Typography>
-                <MUISlider size="small" min={0} max={Math.max(maxWeight, 1)} value={filterThreshold} onChange={(_, v) => setFilterThreshold(v as number)} />
+                <MUISlider size="small" min={0} max={Math.max(filterMax, 1)} value={filterThreshold} onChange={(_, v) => setFilterThreshold(v as number)} />
                 <FormControlLabel sx={{ mt: 0.5 }} control={<Switch checked={filterAffectsAnalytics} onChange={(e) => setFilterAffectsAnalytics(e.target.checked)} />} label="Apply to Analytics" />
               </Box>
             )}
@@ -384,6 +403,48 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
     return null;
   };
 
+  const AutoFitEffect: React.FC = () => {
+    const map = useMap();
+    const appliedRef = React.useRef<number | null>(null);
+
+    useEffect(() => {
+      if (autoFitVersion == null || map == null) return;
+      if (autoFitVersion === appliedRef.current) return;
+
+      const latLngs = (fullCollection.features ?? [])
+        .map((feature) => {
+          const [lng, lat] = feature.geometry.coordinates as [number, number];
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          return L.latLng(lat, lng);
+        })
+        .filter((value): value is L.LatLng => value !== null);
+
+      let bounds: L.LatLngBounds | null = null;
+      if (latLngs.length > 0) {
+        bounds = L.latLngBounds(latLngs);
+      } else if (searchParams?.mode === 'bbox') {
+        const { west, south, east, north } = searchParams;
+        if (
+          typeof west === 'number' && Number.isFinite(west) &&
+          typeof south === 'number' && Number.isFinite(south) &&
+          typeof east === 'number' && Number.isFinite(east) &&
+          typeof north === 'number' && Number.isFinite(north)
+        ) {
+          bounds = L.latLngBounds([south, west], [north, east]);
+        }
+      }
+
+      if (!bounds || !bounds.isValid()) {
+        return;
+      }
+
+      map.fitBounds(bounds.pad(0.1), { maxZoom: 9 });
+      appliedRef.current = autoFitVersion;
+    }, [autoFitVersion, fullCollection, map, searchParams]);
+
+    return null;
+  };
+
   const MeasureLayer: React.FC<{ enabled: boolean; onEnd?: () => void }> = ({ enabled, onEnd }) => {
     const map = useMap();
     const layerRef = React.useRef<L.LayerGroup | null>(null);
@@ -484,6 +545,32 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
     const rendererRef = React.useRef<L.SVG | null>(null);
     const pointsRef = React.useRef<L.LatLng[]>([]);
 
+    const lockInteractions = React.useCallback((lock: boolean) => {
+      const d = map as any;
+      if (lock) {
+        map.dragging.disable();
+        map.scrollWheelZoom.disable();
+        map.boxZoom.disable();
+        map.keyboard.disable();
+        d?.tap?.disable?.();
+        map.touchZoom.disable();
+        map.doubleClickZoom.disable();
+      } else {
+        map.dragging.enable();
+        map.scrollWheelZoom.enable();
+        map.boxZoom.enable();
+        map.keyboard.enable();
+        d?.tap?.enable?.();
+        map.touchZoom.enable();
+        map.doubleClickZoom.enable();
+      }
+    }, [map]);
+
+    React.useEffect(() => {
+      lockInteractions(enabled && !pan);
+      return () => lockInteractions(false);
+    }, [lockInteractions, enabled, pan]);
+
     React.useEffect(() => {
       // ensure a high-zIndex pane for measurement graphics so they stay visible above heatmap/clusters
       const paneName = 'measure-pane';
@@ -497,27 +584,6 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
       if (!savedRef.current) savedRef.current = L.layerGroup().addTo(map);
       if (!rendererRef.current) rendererRef.current = L.svg({ pane: paneName }).addTo(map);
       const layer = layerRef.current;
-      const lockMap = (lock: boolean) => {
-        const d = map as any;
-        if (lock) {
-          map.dragging.disable();
-          map.scrollWheelZoom.disable();
-          map.boxZoom.disable();
-          map.keyboard.disable();
-          (d.tap && d.tap.disable && d.tap.disable());
-          map.touchZoom.disable();
-          map.doubleClickZoom.disable();
-        } else {
-          map.dragging.enable();
-          map.scrollWheelZoom.enable();
-          map.boxZoom.enable();
-          map.keyboard.enable();
-          (d.tap && d.tap.enable && d.tap.enable());
-          map.touchZoom.enable();
-          map.doubleClickZoom.enable();
-        }
-      };
-      lockMap(enabled && !pan);
 
       const kmTo = (km: number) => {
         if (distanceUnit === 'km') return `${km.toFixed(2)} km`;
@@ -745,7 +811,6 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
         if (savedRef.current) { /* keep saved results when unmounting measure */ }
         lineRef.current = null; polyRef.current = null; tipsRef.current = null; segTipsRef.current = [] as any; cursorLineRef.current = null; cursorTipRef.current = null;
         pointsRef.current = [];
-        lockMap(false);
       };
     }, [map, enabled, mode, distanceUnit, areaUnit, pan, clearToken]);
 
@@ -799,7 +864,7 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
     >
       <ScaleControl position="bottomleft" />
       <ViewportReporter />
-      <ScaleControl position="bottomleft" />
+      {autoFitVersion !== undefined && autoFitVersion > 0 && <AutoFitEffect />}
       <MouseCoordsFixed />
       <MeasureLayerPro enabled={measureMode} onEnd={() => setMeasureMode(false)} mode={measureType} distanceUnit={distanceUnit} areaUnit={areaUnit} pan={panMode} clearToken={measureClearToken} />
       {(() => {
@@ -871,7 +936,7 @@ const FireMap: React.FC<FireMapProps> = ({ fireCollection, fullCollection, onSea
               fireCollection={displayCollection}
               weightBy={weightBy}
               threshold={threshold}
-              max={maxWeight}
+              max={weightMax}
             />
           )}
           {showCluster && <FireCluster fireCollection={displayCollection} interactionDisabled={measureMode} />}
