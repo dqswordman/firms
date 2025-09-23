@@ -16,6 +16,11 @@ const resetStore = () => {
       format: 'geojson',
     },
     isInteractionEnabled: true,
+    filters: {
+      frpMin: null,
+      frpMax: null,
+      confidence: 'all',
+    },
     measurement: {
       mode: null,
       points: [],
@@ -53,6 +58,24 @@ describe('map store', () => {
       useMapStore.getState().setShowHeatmap(true);
     });
     expect(useMapStore.getState().showHeatmap).toBe(true);
+  });
+
+  it('submits queries and tracks last submission', () => {
+    const params = {
+      mode: 'country',
+      country: 'USA',
+      startDate: '2024-02-01',
+      endDate: '2024-02-03',
+      format: 'geojson',
+    } as const;
+
+    act(() => {
+      useMapStore.getState().submitQuery({ ...params });
+    });
+
+    const state = useMapStore.getState();
+    expect(state.queryParams).toEqual(params);
+    expect(state.lastSubmittedQuery).toEqual(params);
   });
 
   it('locks map interactions during measurement and restores afterwards', () => {

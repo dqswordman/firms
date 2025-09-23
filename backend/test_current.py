@@ -2,6 +2,7 @@ import requests
 import json
 from datetime import datetime, timedelta
 
+
 def test_current_fires():
     url = "http://localhost:8000/fires"
 
@@ -28,10 +29,16 @@ def test_current_fires():
 
         if response.status_code == 200:
             data = response.json()
-            print("\nResponse Data Length:", len(data))
-            if len(data) > 0:
+            if isinstance(data, dict):
+                records = data.get('features') or data.get('items') or []
+            else:
+                records = data
+
+            print("\nResponse Data Length:", len(records))
+            if records:
                 print("\nFirst few records:")
-                print(json.dumps(data[:3], indent=2))
+                preview = list(records) if not isinstance(records, list) else records
+                print(json.dumps(preview[:3], indent=2, default=str))
             else:
                 print("\nNo data returned")
                 print("\nRaw response content (first 500 chars):")
@@ -42,6 +49,7 @@ def test_current_fires():
 
     except requests.exceptions.RequestException as e:
         print("Error:", str(e))
+
 
 if __name__ == "__main__":
     test_current_fires()

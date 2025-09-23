@@ -23,6 +23,12 @@ export interface MeasurementState {
   areaSquareMeters: number;
 }
 
+export interface FilterState {
+  frpMin: number | null;
+  frpMax: number | null;
+  confidence: 'all' | 'low' | 'nominal' | 'high';
+}
+
 interface MapStore {
   viewport: Viewport;
   setViewport: (update: Partial<Viewport>) => void;
@@ -37,6 +43,10 @@ interface MapStore {
   toggleHeatmap: () => void;
   queryParams: FiresQueryParams | null;
   setQueryParams: (params: FiresQueryParams) => void;
+  lastSubmittedQuery: FiresQueryParams | null;
+  submitQuery: (params: FiresQueryParams) => void;
+  filters: FilterState;
+  setFilters: (update: Partial<FilterState>) => void;
   isInteractionEnabled: boolean;
   setInteractionEnabled: (enabled: boolean) => void;
   measurement: MeasurementState;
@@ -138,6 +148,15 @@ export const useMapStore = create<MapStore>((set) => ({
   toggleHeatmap: () => set((state) => ({ showHeatmap: !state.showHeatmap })),
   queryParams: defaultQuery,
   setQueryParams: (params) => set({ queryParams: params }),
+  lastSubmittedQuery: defaultQuery,
+  submitQuery: (params) => set({ queryParams: params, lastSubmittedQuery: params }),
+  filters: {
+    frpMin: null,
+    frpMax: null,
+    confidence: 'all',
+  },
+  setFilters: (update) =>
+    set((state) => ({ filters: { ...state.filters, ...update } })),
   isInteractionEnabled: true,
   setInteractionEnabled: (enabled) => set({ isInteractionEnabled: enabled }),
   measurement: createDefaultMeasurement(),

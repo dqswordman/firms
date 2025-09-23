@@ -9,6 +9,9 @@
   - Built measurement sidebar controls (`frontend-vite/src/features/map/MeasurementPanel.tsx`) and overlay rendering (`frontend-vite/src/features/map/MeasurementOverlay.tsx`) with shared formatting helpers and dedicated UI tests (`src/__tests__/MeasurementPanel.test.tsx`).
   - Routed live FIRMS data into the map via `frontend-vite/src/features/map/FiresLayer.tsx`, auto-fitting bounds with `fireUtils.ts` helpers and status messaging inside `MapView`.
   - Added layer toggles (`frontend-vite/src/features/map/LayerPanel.tsx`) with supercluster-backed clusters, heatmap legend support, and new utility tests/styling for the Stage 3 shell.
+  - Introduced query submission (`frontend-vite/src/features/map/QueryPanel.tsx`) with validation helpers and vitest coverage, wiring results through Zustand to refresh TanStack Query data.
+  - Added filter controls (`frontend-vite/src/features/map/FilterPanel.tsx`) and reusable helpers (`filterUtils.ts`) to apply FRP/confidence criteria before rendering layers.
+  - Refined map styling: heatmap radius/colour ramps, cluster bubble palette, and added legends (`ClusterLegend.tsx`, CSS updates) to mirror legacy cues.
 - Docs
   - Documented the new map hooks and measurement coverage in `README.md` and updated `todo list.md` Stage 3 status plus progress log.
 
@@ -157,3 +160,12 @@ This document records notable changes applied to the project by the agent.
 - Backend
   - `GET /fires`: when query cannot be prepared (no data availability or invalid inputs), now returns an empty GeoJSON FeatureCollection if `format=geojson`, aligning response shape with frontend expectations.
   - Detect invalid MAP keys: `data_availability` and data fetch now check for FIRMS plain-text errors (e.g., "Invalid MAP_KEY.") and return 503 with guidance instead of silently returning empty results.
+
+## 2025-09-27
+
+- Frontend
+  - Fixed StatsPanel to skip creating a TanStack Query when no query is present, allowing fallback rendering without a QueryClientProvider (`frontend-vite/src/features/map/StatsPanel.tsx`).
+- CI
+  - Enabled backend pytest in CI (`.github/workflows/ci.yml`) to run unit tests after syntax check.
+- Docs
+  - Clarified backend run commands for legacy vs modular app in `README.md`.

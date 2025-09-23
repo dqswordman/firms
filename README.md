@@ -61,7 +61,11 @@ ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
 Run the API:
 ```bash
+cd backend
+# Legacy entry (kept during migration)
 uvicorn main:app --reload
+# New modular entry
+uvicorn app.main:app --reload
 ```
 
 ### Stage 1 scaffolding (in progress)
@@ -81,7 +85,10 @@ uvicorn main:app --reload
 - Map measurement state (points, length, area) is stored via `src/stores/mapStore.ts` with unit tests in `src/__tests__/mapStore.test.ts` covering interaction toggles and auto-fit requests.
 - `frontend-vite/src/features/map/MeasurementPanel.tsx` surfaces measurement controls and formatting helpers while keeping map toggles in sync.
 - `frontend-vite/src/features/map/MeasurementOverlay.tsx` draws live polylines/polygons with summary tooltips for completed measurements.
-- `frontend-vite/src/features/map/LayerPanel.tsx` manages point/cluster/heatmap toggles linked to Zustand state, with `HeatmapLegend.tsx` documenting FRP intensity.
+- `frontend-vite/src/features/map/TimeSlider.tsx` adjusts the active date span (<=10 days) while keeping queries in sync.
+- `frontend-vite/src/features/map/QueryPanel.tsx` collects country/bbox + date filters, validates input, and triggers TanStack Query submissions.
+- `frontend-vite/src/features/map/FilterPanel.tsx` manages FRP range and confidence filters applied client-side before rendering.
+- `frontend-vite/src/features/map/LayerPanel.tsx` manages point/cluster/heatmap toggles linked to Zustand state, with `HeatmapLegend.tsx` and `ClusterLegend.tsx` documenting intensity bins.
 - `frontend-vite/src/features/map/FiresLayer.tsx` provides point, cluster (supercluster-backed), and heatmap renderers, reusing FIRMS metadata via helpers in `fireUtils.ts`.
 
 Endpoints:

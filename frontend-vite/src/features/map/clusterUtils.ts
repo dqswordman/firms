@@ -4,6 +4,7 @@ import type { FireFeatureCollection } from '../../types';
 export interface ClusterProperties {
   frp?: number;
   originalIndex?: number;
+  dummy?: boolean;
 }
 
 type ClusterPoint = Supercluster.PointFeature<ClusterProperties>;

@@ -39,5 +39,6 @@ rontend/ with lint/test tooling
 - 2025-09-24: Stage 2 underway (FIRMS client/service modules scaffolded, CI+Prettier/Vitest baseline).
 - 2025-09-25: Stage 2 moving into API replacement (new /api/fires + stats, pytest passing)
 - 2025-09-25: Stage 3 map core scaffolding (Zustand store + React-Leaflet shell).
-- 2025-09-26: Stage 3 measurement controls + heatmap/point/cluster toggles with auto-fit shipped (unit coverage; e2e planned)
-
+- 2025-09-26: Stage 3 measurement + query panel + heatmap/point/cluster styling & legends shipped (unit coverage; e2e planned)
+- 2025-09-27: Stage 4 time slider + filter integration underway (unit coverage; Stage 4 ongoing)
+- 2025-09-27: CI now runs backend pytest; fixed StatsPanel fallback to avoid requiring QueryClientProvider.

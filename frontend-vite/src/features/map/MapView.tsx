@@ -8,7 +8,9 @@ import { useMeasureTool } from './hooks/useMeasureTool';
 import { MeasurementOverlay } from './MeasurementOverlay';
 import { FiresClusterLayer, FiresHeatmapLayer, FiresPointsLayer } from './FiresLayer';
 import { HeatmapLegend } from './HeatmapLegend';
+import { ClusterLegend } from './ClusterLegend';
 import { extractFirePoints, boundsFromPoints } from './fireUtils';
+import { applyFilters } from './filterUtils';
 
 const MAP_PADDING: [number, number] = [48, 48];
 
@@ -34,13 +36,14 @@ const MapControllers: React.FC = () => {
 };
 
 export const MapView: React.FC = () => {
-  const { viewport, baseLayer, queryParams, showPoints, showClusters, showHeatmap } = useMapStore((state) => ({
+  const { viewport, baseLayer, queryParams, showPoints, showClusters, showHeatmap, filters } = useMapStore((state) => ({
     viewport: state.viewport,
     baseLayer: state.baseLayer,
     queryParams: state.queryParams,
     showPoints: state.showPoints,
     showClusters: state.showClusters,
     showHeatmap: state.showHeatmap,
+    filters: state.filters,
   }));
   const requestAutoFit = useMapStore((state) => state.requestAutoFit);
 
@@ -57,13 +60,14 @@ export const MapView: React.FC = () => {
   });
 
   const lastFitSignature = useRef<string | null>(null);
+  const filteredData = useMemo(() => applyFilters(data, filters), [data, filters]);
 
   useEffect(() => {
-    if (!enableQueries || !data || !queryParams) {
+    if (!enableQueries || !filteredData || !queryParams) {
       return;
     }
 
-    const points = extractFirePoints(data);
+    const points = extractFirePoints(filteredData);
     if (!points.length) {
       lastFitSignature.current = `${JSON.stringify(queryParams)}::empty`;
       return;
@@ -102,12 +106,12 @@ export const MapView: React.FC = () => {
       return 'Loading recent fire activity...';
     }
 
-    if (data && data.features.length === 0) {
+    if (filteredData && filteredData.features.length === 0) {
       return 'No fire detections found for the selected range.';
     }
 
     return undefined;
-  }, [data, enableQueries, error, isError, isFetching]);
+  }, [enableQueries, error, filteredData, isError, isFetching]);
 
   return (
     <div className="map-view-root">
@@ -115,11 +119,12 @@ export const MapView: React.FC = () => {
         <TileLayer attribution="&copy; OpenStreetMap contributors" url={tileUrl} />
         <ViewportSync />
         <MapControllers />
-        {showPoints ? <FiresPointsLayer collection={data} /> : null}
-        {showClusters ? <FiresClusterLayer collection={data} /> : null}
-        {showHeatmap ? <FiresHeatmapLayer collection={data} /> : null}
+        {showPoints ? <FiresPointsLayer collection={filteredData ?? data} /> : null}
+        {showClusters ? <FiresClusterLayer collection={filteredData ?? data} /> : null}
+        {showHeatmap ? <FiresHeatmapLayer collection={filteredData ?? data} /> : null}
         <MeasurementOverlay />
       </MapContainer>
+      {showClusters ? <ClusterLegend /> : null}
       {showHeatmap ? <HeatmapLegend /> : null}
       {statusMessage ? (
         <div className="map-status" role="status">

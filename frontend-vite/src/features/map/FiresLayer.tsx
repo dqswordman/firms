@@ -15,15 +15,23 @@ const pointStyle = {
   fillOpacity: 0.8,
 };
 
+const clusterPalette = ['#38bdf8', '#fb7185', '#f97316'];
+
+const pickClusterColor = (count: number): string => {
+  if (count >= 500) return clusterPalette[2];
+  if (count >= 100) return clusterPalette[1];
+  return clusterPalette[0];
+};
+
 const heatmapStyle = (frp: number | undefined) => {
-  const clamped = Math.min(Math.max(frp ?? 0, 0), 400);
-  const radius = 8 + clamped / 25;
+  const value = Math.max(frp ?? 0, 0);
+  const radius = Math.min(20, 6 + Math.sqrt(value) * 0.9);
   let fillColor = '#4ade80';
-  if (clamped >= 300) {
+  if (value >= 300) {
     fillColor = '#f97316';
-  } else if (clamped >= 150) {
+  } else if (value >= 150) {
     fillColor = '#fb7185';
-  } else if (clamped >= 60) {
+  } else if (value >= 60) {
     fillColor = '#38bdf8';
   }
   return {
@@ -32,7 +40,7 @@ const heatmapStyle = (frp: number | undefined) => {
     color: fillColor,
     weight: 0,
     opacity: 0,
-    fillOpacity: 0.65,
+    fillOpacity: 0.7,
   };
 };
 
@@ -75,9 +83,10 @@ export const FiresHeatmapLayer: React.FC<FiresLayerProps> = ({ collection }) => 
 };
 
 const createClusterIcon = (count: number) => {
-  const size = Math.max(32, Math.min(24 + count * 1.2, 52));
+  const color = pickClusterColor(count);
+  const size = Math.max(34, Math.min(26 + Math.log2(count + 1) * 12, 56));
   return L.divIcon({
-    html: `<div class="cluster-bubble" style="width:${size}px;height:${size}px;">${count}</div>`,
+    html: `<div class="cluster-bubble" style="width:${size}px;height:${size}px;background:${color};">${count}</div>`,
     className: '',
     iconSize: [size, size],
   });
