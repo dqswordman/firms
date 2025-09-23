@@ -4,13 +4,14 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
 
 ## Must
 - [x] Stage 1: Framework scaffolding
-  - AC: Vite + React + Zustand skeleton committed under 
-rontend/ with lint/test tooling
-  - AC: FastAPI modular layout (pp/api, pp/services, pp/clients, pp/core, pp/schemas)
+  - AC: Vite + React + Zustand skeleton committed under frontend-vite/ with lint/test tooling
+  - AC: FastAPI modular layout (app/api, app/services, app/clients, app/core, app/schemas) with CORS + GZip
   - AC: GitHub Actions workflow running lint + unit tests
 - Stage 2: Data & API layer
   - [x] AC: FIRMS client with retries/cache + unified error model
   - AC: /fires & /fires/stats rewritten with typed responses and tests (mock FIRMS)
+    - [x] Route tests for modular /api (`backend/tests/test_api_routes.py`)
+    - [ ] Typed response models in `app/schemas` and response_model wiring
   - AC: Frontend query service (Axios + TanStack Query) covering retries/toasts
 - Stage 3: Map core reimplementation
   - [x] AC: Hooks useMapInteractions, useMeasureTool, useAutoFit; Zustand store for map state

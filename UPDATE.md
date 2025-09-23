@@ -1,5 +1,30 @@
 ﻿# Update Log
 
+## 2025-09-27
+
+- Backend
+  - Enabled CORS and GZip middleware in the modular FastAPI app (`backend/app/main.py`) to match legacy behaviour while reading allowed origins from `ALLOWED_ORIGINS`.
+  - Updated README validation instructions to include `python -m py_compile backend/app/main.py`.
+  - Added pytest coverage for modular routes under `backend/tests/test_api_routes.py` (health, fires, stats) with FIRMS and availability mocked.
+  - Added temporary legacy compatibility by mounting the fires router at root (`/fires`, `/fires/stats`) alongside `/api/*`.
+  - Fixed `Settings` to resolve `backend/.env` via absolute path so `FIRMS_MAP_KEY` loads correctly regardless of working directory.
+  - Full cutover to modular app: removed legacy `backend/main.py` and dropped compatibility routes; tests updated to target `app.main` and services only. Removed manual HTTP scripts.
+- Docs
+  - Marked Stage 1 as complete and clarified middleware in `README.md`. Updated backend/frontend setup to modular+Vite only.
+  - Fixed typos/control characters in `todo list.md` and noted modular layout now includes CORS + GZip.
+  - Updated README to note modular route tests inclusion.
+  - Added Vite dev origins (5173) to example `ALLOWED_ORIGINS` and updated local `.env` to resolve CORS "Failed to fetch" during dev.
+
+Validation
+- Frontend legacy typecheck: `cd frontend && npx tsc -p tsconfig.json --noEmit` passed.
+- Backend syntax check: `python -m py_compile backend/main.py` passed.
+- Backend syntax check (modular): `python -m py_compile backend/app/main.py` passed.
+- Backend tests: `cd backend && pytest -q` passed (26 tests).
+- Backend tests: `cd backend && pytest -q` passed (30 tests).
+
+Next
+- Proceed with Stage 2/3 polishing: firm up `/api/fires` error shapes and add typed response schemas in `app/schemas`.
+
 ## 2025-09-26
 
 - Frontend

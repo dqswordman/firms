@@ -2,7 +2,7 @@ import pytest
 from fastapi import HTTPException
 
 from utils.http_exceptions import HTTPExceptionFactory
-from main import _parse_date
+from app.services.fires import FireService
 
 
 def test_http_exception_factory_structure():
@@ -14,6 +14,6 @@ def test_http_exception_factory_structure():
 
 def test_parse_date_invalid_format():
     with pytest.raises(HTTPException) as exc_info:
-        _parse_date("20240101")
+        FireService._parse_date("20240101")
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail["code"] == 400

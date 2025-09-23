@@ -1,6 +1,6 @@
 # FIRMS Wildfire Explorer
 
-> **Status**: Legacy codebase under full rebuild. This README tracks both the current production behaviour and the staged roadmap (Stage 1-5) that will deliver the new architecture.
+> **Status**: New modular architecture is the default. This README documents the current behaviour and staged roadmap (Stage 1-5).
 
 The application delivers a NASA FIRMS inspired wildfire intelligence workspace with single-range data fetching, map visualisation, analytics, and sharing. During the rebuild we will retain all user-facing features while progressively migrating to a modern, modular stack.
 
@@ -45,7 +45,7 @@ Each stage must ship a running build, updated documentation, and automated tests
 - Python 3.11+
 - FIRMS MAP key with area CSV permissions
 
-## Backend Setup (legacy)
+## Backend Setup
 ```bash
 cd backend
 python -m venv .venv
@@ -56,25 +56,29 @@ pip install -r requirements.txt
 Create `backend/.env`:
 ```
 FIRMS_MAP_KEY=your_map_key_here
-ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000
+MAX_CONCURRENT_REQUESTS=5
 ```
 
 Run the API:
 ```bash
 cd backend
-# Legacy entry (kept during migration)
-uvicorn main:app --reload
-# New modular entry
 uvicorn app.main:app --reload
 ```
 
-### Stage 1 scaffolding (in progress)
+Endpoints (modular):
+- `GET /api/fires` — GeoJSON (default) or JSON; params: `country` or `west/south/east/north`, `start_date`, `end_date`, optional `sourcePriority`, `format` (`json|geojson`), `maxConcurrency`.
+- `GET /api/fires/stats` — FRP buckets, day/night, confidence, satellite distribution。
+- `GET /api/health` — liveness probe。
 
-- New modular entrypoint: `backend/app/main.py` (FastAPI app factory with `/api` router placeholder).
+### Stage 1 — Framework (complete)
+
+- New modular entrypoint: `backend/app/main.py` (FastAPI app factory with `/api` router and production middlewares).
 - Configuration via `app/core/config.py` (`pydantic-settings`); ensure `pydantic-settings` installed from `requirements.txt`.
-- Legacy `backend/main.py` remains active until Stage 2 migrates existing routes.
+- Legacy `backend/main.py` has been removed; use `app.main:app` exclusively.
 - `.env.example` contains placeholders for FIRMS credentials; copy to `backend/.env` before running.
 - Stage 2 adds `frontend-vite/src/services` and `src/queries` for Axios + TanStack Query integration against the new `/api/fires` endpoints. Set `VITE_API_BASE_URL` in `frontend-vite/.env` as needed.
+ - CORS and GZip middleware are enabled for the modular app using `ALLOWED_ORIGINS` and a 1KB compression threshold to match legacy behaviour.
 
 ### Stage 3 (in progress)
 
@@ -91,39 +95,28 @@ uvicorn app.main:app --reload
 - `frontend-vite/src/features/map/LayerPanel.tsx` manages point/cluster/heatmap toggles linked to Zustand state, with `HeatmapLegend.tsx` and `ClusterLegend.tsx` documenting intensity bins.
 - `frontend-vite/src/features/map/FiresLayer.tsx` provides point, cluster (supercluster-backed), and heatmap renderers, reusing FIRMS metadata via helpers in `fireUtils.ts`.
 
-Endpoints:
-- `GET /fires` - Returns GeoJSON (default) or JSON fire records. Query params include `country` or `west/south/east/north`, `start_date`, `end_date`, optional `sourcePriority`, `format` (`json|geojson`), and `maxConcurrency`.
-- `GET /fires/stats` - Aggregated FRP buckets, day/night counts, confidence, and satellite distribution using the same query contract.
-- `GET /health` - Liveness probe.
-
-## Frontend Setup (legacy)
+## Frontend Setup (Vite)
 ```bash
-cd frontend
+cd frontend-vite
 npm install
+npm run dev
 ```
-
-Create `frontend/.env`:
+Optional: `frontend-vite/.env`
 ```
-REACT_APP_API_URL=http://localhost:8000
+VITE_API_BASE_URL=http://localhost:8000/api
 ```
-
-Start the UI:
-```bash
-npm start
-```
-Visit http://localhost:3000 and search by ISO3 or bounding box. The legacy client still auto-fits once results arrive; Stage 3 will introduce a new auto-fit hook without the current snap-back issues.
+Visit http://localhost:5173
 
 ## Validation & Tooling
-- Legacy frontend: `cd frontend && npx tsc -p tsconfig.json --noEmit`
-- Stage 1 frontend scaffold:
+- Frontend (Vite):
   - `cd frontend-vite && npm run lint`
   - `cd frontend-vite && npm run test`
   - `cd frontend-vite && npm run build`
   - `cd frontend-vite && npm run format` (check) / `npm run format:write`
 - Backend:
-  - Syntax check: `python -m py_compile backend/main.py`
+  - Syntax check: `python -m py_compile backend/app/main.py`
   - Modular services: `cd backend && pytest`
-- Upcoming: Stage 2 will introduce pytest suites for backend routes.
+- Stage 2 adds pytest suites for the modular backend routes (now included under `backend/tests/test_api_routes.py`).
 
 ## Map & UI Notes
 - **Layer panel**: Fires / Overlays / Backgrounds / Analytics are collapsible. LAYERS button scrolls and highlights the control card.
@@ -139,7 +132,7 @@ Visit http://localhost:3000 and search by ISO3 or bounding box. The legacy clien
 - CSV ingestion de-duplicates points using `(acq_date, acq_time, lat, lon, source)` key and normalises property names (brightness, confidence, FRP, etc.).
 
 ## Troubleshooting
-- **Invalid MAP key**: `/fires` returns 503 with `Invalid ... MAP_KEY`. Regenerate the key and update `backend/.env`.
+- **Invalid MAP key**: `/api/fires` returns 503 with `Invalid ... MAP_KEY`. Regenerate the key and update `backend/.env`.
 - **Empty response**: verify the requested dataset covers the date range (max 10 days) and the bbox is correct. The response will include `X-Data-Availability` when the dataset has no coverage.
 - **CORS errors**: ensure the frontend origin is listed in `ALLOWED_ORIGINS`.
 - **Frontend build issues**: clear node modules (`rm -rf node_modules && npm install`) and re-run TypeScript check.

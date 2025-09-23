@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import List, Optional
 
 from pydantic import Field
@@ -30,7 +31,8 @@ class Settings(BaseSettings):
     default_source_priority: List[str] = Field(default_factory=lambda: DEFAULT_SOURCE_PRIORITY)
 
     class Config:
-        env_file = "backend/.env"
+        # Resolve absolute path to backend/.env regardless of current working directory
+        env_file = str(Path(__file__).resolve().parents[2] / ".env")
         case_sensitive = False
 
     @property
