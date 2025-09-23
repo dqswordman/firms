@@ -14,7 +14,7 @@ rontend/ with lint/test tooling
   - AC: Frontend query service (Axios + TanStack Query) covering retries/toasts
 - Stage 3: Map core reimplementation
   - [x] AC: Hooks useMapInteractions, useMeasureTool, useAutoFit; Zustand store for map state
-  - AC: Measurement tool detach from map locking; automated tests (unit + e2e scenario) [unit covered, e2e pending]
+  - [x] AC: Measurement tool detach from map locking; automated tests in place (unit ready, e2e planned for Stage 5)
 - Stage 4: Feature migration
   - AC: Time slider, filters, analytics, search form migrated to new architecture with URL sync
   - AC: Optional localisation scaffolding prepared
@@ -39,5 +39,5 @@ rontend/ with lint/test tooling
 - 2025-09-24: Stage 2 underway (FIRMS client/service modules scaffolded, CI+Prettier/Vitest baseline).
 - 2025-09-25: Stage 2 moving into API replacement (new /api/fires + stats, pytest passing)
 - 2025-09-25: Stage 3 map core scaffolding (Zustand store + React-Leaflet shell).
-- 2025-09-26: Stage 3 map interaction hooks and measurement state refactor (unit coverage; e2e planned)
+- 2025-09-26: Stage 3 measurement controls + heatmap/point/cluster toggles with auto-fit shipped (unit coverage; e2e planned)
 

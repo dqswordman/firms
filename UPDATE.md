@@ -6,6 +6,9 @@
   - Extended `frontend-vite/src/stores/mapStore.ts` to manage measurement state, interaction toggles, and queued auto-fit bounds with distance/area calculations.
   - Added dedicated map hooks (`useMapInteractions`, `useMeasureTool`, `useAutoFit`) under `frontend-vite/src/features/map/hooks/` and wired them into `MapView`.
   - Introduced map interaction styling cues in `frontend-vite/src/index.css` and refreshed unit tests (`src/__tests__/mapStore.test.ts`) for measurement flow and auto-fit requests.
+  - Built measurement sidebar controls (`frontend-vite/src/features/map/MeasurementPanel.tsx`) and overlay rendering (`frontend-vite/src/features/map/MeasurementOverlay.tsx`) with shared formatting helpers and dedicated UI tests (`src/__tests__/MeasurementPanel.test.tsx`).
+  - Routed live FIRMS data into the map via `frontend-vite/src/features/map/FiresLayer.tsx`, auto-fitting bounds with `fireUtils.ts` helpers and status messaging inside `MapView`.
+  - Added layer toggles (`frontend-vite/src/features/map/LayerPanel.tsx`) with supercluster-backed clusters, heatmap legend support, and new utility tests/styling for the Stage 3 shell.
 - Docs
   - Documented the new map hooks and measurement coverage in `README.md` and updated `todo list.md` Stage 3 status plus progress log.
 

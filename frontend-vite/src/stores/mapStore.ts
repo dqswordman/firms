@@ -28,7 +28,12 @@ interface MapStore {
   setViewport: (update: Partial<Viewport>) => void;
   baseLayer: BaseLayer;
   setBaseLayer: (layer: BaseLayer) => void;
+  showPoints: boolean;
+  setShowPoints: (visible: boolean) => void;
+  showClusters: boolean;
+  setShowClusters: (visible: boolean) => void;
   showHeatmap: boolean;
+  setShowHeatmap: (visible: boolean) => void;
   toggleHeatmap: () => void;
   queryParams: FiresQueryParams | null;
   setQueryParams: (params: FiresQueryParams) => void;
@@ -124,7 +129,12 @@ export const useMapStore = create<MapStore>((set) => ({
     })),
   baseLayer: 'osm',
   setBaseLayer: (layer) => set({ baseLayer: layer }),
-  showHeatmap: true,
+  showPoints: true,
+  setShowPoints: (visible) => set({ showPoints: visible }),
+  showClusters: true,
+  setShowClusters: (visible) => set({ showClusters: visible }),
+  showHeatmap: false,
+  setShowHeatmap: (visible) => set({ showHeatmap: visible }),
   toggleHeatmap: () => set((state) => ({ showHeatmap: !state.showHeatmap })),
   queryParams: defaultQuery,
   setQueryParams: (params) => set({ queryParams: params }),

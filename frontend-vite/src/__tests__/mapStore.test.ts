@@ -5,7 +5,9 @@ const resetStore = () => {
   useMapStore.setState({
     viewport: { center: [37.8, -96.9], zoom: 4 },
     baseLayer: 'osm',
-    showHeatmap: true,
+    showPoints: true,
+    showClusters: true,
+    showHeatmap: false,
     queryParams: {
       mode: 'country',
       country: 'USA',
@@ -34,6 +36,23 @@ describe('map store', () => {
       useMapStore.getState().setViewport({ zoom: 5 });
     });
     expect(useMapStore.getState().viewport.zoom).toBe(5);
+  });
+
+  it('updates layer visibility toggles', () => {
+    act(() => {
+      useMapStore.getState().setShowPoints(false);
+    });
+    expect(useMapStore.getState().showPoints).toBe(false);
+
+    act(() => {
+      useMapStore.getState().setShowClusters(false);
+    });
+    expect(useMapStore.getState().showClusters).toBe(false);
+
+    act(() => {
+      useMapStore.getState().setShowHeatmap(true);
+    });
+    expect(useMapStore.getState().showHeatmap).toBe(true);
   });
 
   it('locks map interactions during measurement and restores afterwards', () => {

@@ -79,6 +79,10 @@ uvicorn main:app --reload
 - `frontend-vite/src/index.css` defines the app shell layout; map output currently uses default OpenStreetMap tiles.
 - `frontend-vite/src/features/map/hooks/` now provides `useMapInteractions`, `useAutoFit`, and `useMeasureTool` to coordinate map behaviour without lingering locks after measurement.
 - Map measurement state (points, length, area) is stored via `src/stores/mapStore.ts` with unit tests in `src/__tests__/mapStore.test.ts` covering interaction toggles and auto-fit requests.
+- `frontend-vite/src/features/map/MeasurementPanel.tsx` surfaces measurement controls and formatting helpers while keeping map toggles in sync.
+- `frontend-vite/src/features/map/MeasurementOverlay.tsx` draws live polylines/polygons with summary tooltips for completed measurements.
+- `frontend-vite/src/features/map/LayerPanel.tsx` manages point/cluster/heatmap toggles linked to Zustand state, with `HeatmapLegend.tsx` documenting FRP intensity.
+- `frontend-vite/src/features/map/FiresLayer.tsx` provides point, cluster (supercluster-backed), and heatmap renderers, reusing FIRMS metadata via helpers in `fireUtils.ts`.
 
 Endpoints:
 - `GET /fires` - Returns GeoJSON (default) or JSON fire records. Query params include `country` or `west/south/east/north`, `start_date`, `end_date`, optional `sourcePriority`, `format` (`json|geojson`), and `maxConcurrency`.
