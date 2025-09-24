@@ -30,12 +30,12 @@ describe('TimeSlider', () => {
     expect(screen.getByText(/2 day/)).toBeInTheDocument();
   });
 
-  it('submits updated range when slider changes', () => {
+  it('updates date filter when slider changes', () => {
     render(<TimeSlider />);
     const slider = screen.getByLabelText(/Range/i) as HTMLInputElement;
     fireEvent.change(slider, { target: { value: '5' } });
     const state = useMapStore.getState();
-    expect(state.lastSubmittedQuery?.startDate).toBe('2023-12-30');
-    expect(state.queryParams?.startDate).toBe('2023-12-30');
+    expect(state.filters.dateStart).toBe('2023-12-30');
+    expect(state.filters.dateEnd).toBe('2024-01-03');
   });
 });

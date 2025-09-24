@@ -36,7 +36,7 @@ const MapControllers: React.FC = () => {
 };
 
 export const MapView: React.FC = () => {
-  const { viewport, baseLayer, queryParams, showPoints, showClusters, showHeatmap, filters } = useMapStore((state) => ({
+  const { viewport, baseLayer, queryParams, showPoints, showClusters, showHeatmap, filters, showMap } = useMapStore((state) => ({
     viewport: state.viewport,
     baseLayer: state.baseLayer,
     queryParams: state.queryParams,
@@ -44,6 +44,7 @@ export const MapView: React.FC = () => {
     showClusters: state.showClusters,
     showHeatmap: state.showHeatmap,
     filters: state.filters,
+    showMap: state.showMap,
   }));
   const requestAutoFit = useMapStore((state) => state.requestAutoFit);
 
@@ -113,6 +114,10 @@ export const MapView: React.FC = () => {
     return undefined;
   }, [enableQueries, error, filteredData, isError, isFetching]);
 
+  if (!showMap) {
+    return null;
+  }
+
   return (
     <div className="map-view-root">
       <MapContainer center={viewport.center} zoom={viewport.zoom} style={{ height: '100%', width: '100%' }}>
@@ -124,6 +129,9 @@ export const MapView: React.FC = () => {
         {showHeatmap ? <FiresHeatmapLayer collection={filteredData ?? data} /> : null}
         <MeasurementOverlay />
       </MapContainer>
+      {enableQueries && ((filteredData ?? data)?.features?.length ?? 0) > 0 ? (
+        <div className="map-badge">Loaded {((filteredData ?? data)?.features?.length ?? 0)} features</div>
+      ) : null}
       {showClusters ? <ClusterLegend /> : null}
       {showHeatmap ? <HeatmapLegend /> : null}
       {statusMessage ? (

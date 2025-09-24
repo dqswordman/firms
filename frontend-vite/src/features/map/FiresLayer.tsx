@@ -58,11 +58,31 @@ const toGeoJson = (collection?: FireFeatureCollection): GeoJsonObject => {
 export const FiresPointsLayer: React.FC<FiresLayerProps> = ({ collection }) => {
   const data = useMemo(() => toGeoJson(collection), [collection]);
 
+  const onEachFeature = (feature: any, layer: L.Layer) => {
+    const props = feature?.properties || {};
+    const d = props.acq_date ?? (props.acq_datetime ? String(props.acq_datetime).slice(0, 10) : '');
+    const t = props.acq_time ?? '';
+    const frp = props.frp ?? props.FRP ?? '-';
+    const conf = props.confidence ?? '-';
+    const sat = props.satellite ?? '-';
+    const src = props.source ?? '-';
+    const html = `
+      <div style="min-width:200px;font:12px/1.4 system-ui"> 
+        <div><b>Date</b>: ${d} ${t}</div>
+        <div><b>FRP</b>: ${frp}</div>
+        <div><b>Confidence</b>: ${conf}</div>
+        <div><b>Satellite</b>: ${sat}</div>
+        <div><b>Source</b>: ${src}</div>
+      </div>`;
+    (layer as any).bindPopup(html); (layer as any).on("click", () => (layer as any).openPopup());
+  };
+
   return (
     <GeoJSON
       key="fires-points"
       data={data}
       pointToLayer={(_, latlng) => L.circleMarker(latlng, pointStyle)}
+      onEachFeature={onEachFeature}
     />
   );
 };
@@ -174,3 +194,6 @@ export const FiresClusterLayer: React.FC<FiresLayerProps> = ({ collection }) => 
     </LayerGroup>
   );
 };
+
+
+

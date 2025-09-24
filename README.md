@@ -66,12 +66,9 @@ cd backend
 uvicorn app.main:app --reload
 ```
 
-Endpoints (modular):
-- `GET /api/fires` â€” GeoJSON (default) or JSON; params: `country` or `west/south/east/north`, `start_date`, `end_date`, optional `sourcePriority`, `format` (`json|geojson`), `maxConcurrency`.
-- `GET /api/fires/stats` â€” FRP buckets, day/night, confidence, satellite distributionã€‚
-- `GET /api/health` â€” liveness probeã€‚
-
-### Stage 1 â€” Framework (complete)
+- Endpoints (modular):
+- GET /api/fires ¡ª GeoJSON (default) or JSON; params: country (mapped to bbox) or west/south/east/north, start_date, end_date, optional sourcePriority, ormat (json|geojson), maxConcurrency.\n- GET /api/fires/stats ¡ª FRP buckets, day/night, confidence, satellite distribution.\n- GET /api/health ¡ª liveness probe.
+### Stage 1 â€?Framework (complete)
 
 - New modular entrypoint: `backend/app/main.py` (FastAPI app factory with `/api` router and production middlewares).
 - Configuration via `app/core/config.py` (`pydantic-settings`); ensure `pydantic-settings` installed from `requirements.txt`.
@@ -98,7 +95,7 @@ Endpoints (modular):
 ## Frontend Setup (Vite)
 ```bash
 cd frontend-vite
-npm install
+npm install   # includes react-chartjs-2 + chart.js used by Charts panel
 npm run dev
 ```
 Optional: `frontend-vite/.env`
@@ -118,12 +115,22 @@ Visit http://localhost:5173
   - Modular services: `cd backend && pytest`
 - Stage 2 adds pytest suites for the modular backend routes (now included under `backend/tests/test_api_routes.py`).
 
+### Debugging FIRMS key / availability
+- Check availability quickly: `http://localhost:8000/api/debug/availability` (optional `?sensor=ALL|VIIRS_SNPP_NRT|...`).
+- If this returns 503 or empty mapping, verify your `FIRMS_MAP_KEY`.
+- Inspect composed upstream URLs (key masked) for any query:
+  - `http://localhost:8000/api/fires/debug/compose?country=USA&start_date=2025-09-20&end_date=2025-09-23`
+  - Note: We always call FIRMS v4 "area" endpoint under the hood (country endpoint is currently unavailable per FIRMS site). USA is mapped to a large bbox; consider smaller bbox for faster results.
+
 ## Map & UI Notes
-- **Layer panel**: Fires / Overlays / Backgrounds / Analytics are collapsible. LAYERS button scrolls and highlights the control card.
-- **Filters**: FRP and Brightness sliders share metric ranges; enabling "Apply to Analytics" keeps Statistics/Trend/Radar aligned.
+- **Dashboard-first**: default view is a Dashboard (Root). Map is an entry you open when needed; close to return.
+- **Filters**: FRP, Confidence and Date filters; Time window drives a client-side date filter (no refetch). Confidence normalization: numeric >=80->high, >=30->nominal, else low; h/n/l textual forms supported.
 - **Auto viewport**: Every new query fits the map to returned features (or bbox fallback) before user adjustments.
-- **Timeline**: dual slider keeps current-day highlight; quick range buttons recompute date ranges without re-querying.
-- **Measurement**: Distance/Area with km/mi/m and kmÂ²/miÂ²/ha, per-segment labels, ESC cancel, Pan toggle, Clear reset.
+- **Time window**: slider adjusts active date span (<= 10 days) without re-querying; presets (24h/48h/7d/custom) use the region¡¯s approximate timezone.
+- **Points**: click any fire point to see a detail popup (date/time, FRP, confidence, satellite, source).
+- **Charts**: Daily counts (line) and a Radar chart (today: VIIRS/Terra/Aqua) with toggles; both reflect current Filters.
+- **Map badge**: when data is present, a Loaded N features badge appears on the map for quick feedback.
+- **Measurement**: Distance/Area with km/mi/m and km^2/mi^2/ha, per-segment labels, ESC cancel, Pan toggle, Clear reset.
 
 ## Backend Behaviour
 - Data availability metadata is cached per MAP key + sensor for 600 seconds to avoid redundant FIRMS calls.
@@ -133,6 +140,7 @@ Visit http://localhost:5173
 
 ## Troubleshooting
 - **Invalid MAP key**: `/api/fires` returns 503 with `Invalid ... MAP_KEY`. Regenerate the key and update `backend/.env`.
+- **400 Bad Request on dates**: Ensure `end_date` is not in the future and the range is â‰?10 days. The UI now prevents future dates.
 - **Empty response**: verify the requested dataset covers the date range (max 10 days) and the bbox is correct. The response will include `X-Data-Availability` when the dataset has no coverage.
 - **CORS errors**: ensure the frontend origin is listed in `ALLOWED_ORIGINS`.
 - **Frontend build issues**: clear node modules (`rm -rf node_modules && npm install`) and re-run TypeScript check.
@@ -142,3 +150,5 @@ See [`UPDATE.md`](UPDATE.md) for reverse-chronological agent summaries.
 
 ## License
 MIT License
+
+

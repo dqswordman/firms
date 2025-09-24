@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMapStore } from '../../stores';
 
 const clampDays = (value: number): number => Math.min(Math.max(value, 1), 10);
@@ -18,7 +18,7 @@ const computeSpan = (start: string, end: string): number => {
 
 export const TimeSlider: React.FC = () => {
   const lastQuery = useMapStore((state) => state.lastSubmittedQuery);
-  const submitQuery = useMapStore((state) => state.submitQuery);
+  const setFilters = useMapStore((state) => state.setFilters);
 
   const endDate = lastQuery?.endDate ?? new Date().toISOString().slice(0, 10);
   const initialSpan = useMemo(() => {
@@ -34,18 +34,17 @@ export const TimeSlider: React.FC = () => {
     const raw = Number(event.target.value);
     const days = clampDays(raw);
     setSpan(days);
-
-    if (!lastQuery) {
-      return;
-    }
-
     const nextStart = subtractDays(endDate, days - 1);
-    submitQuery({
-      ...lastQuery,
-      startDate: nextStart,
-      endDate,
-    });
+    setFilters({ dateStart: nextStart, dateEnd: endDate });
   };
+
+  // Initialize date filter to the last query range when query changes
+  useEffect(() => {
+    if (lastQuery?.startDate && lastQuery?.endDate) {
+      setFilters({ dateStart: lastQuery.startDate, dateEnd: lastQuery.endDate });
+      setSpan(computeSpan(lastQuery.startDate, lastQuery.endDate));
+    }
+  }, [lastQuery?.startDate, lastQuery?.endDate, setFilters]);
 
   return (
     <section className="time-card">
@@ -65,9 +64,7 @@ export const TimeSlider: React.FC = () => {
         />
         <div className="time-slider__summary">
           <span>{span} day(s)</span>
-          <span>
-            {lastQuery?.startDate ?? subtractDays(endDate, span - 1)} to {endDate}
-          </span>
+          <span>{subtractDays(endDate, span - 1)} to {endDate}</span>
         </div>
       </div>
     </section>

@@ -4,13 +4,14 @@ from pprint import pprint
 from datetime import datetime
 
 def debug_response():
-    url = "http://localhost:8000/fires"
+    url = "http://localhost:8000/api/fires"
 
     # Use parameters consistent with the frontend
     params = {
         "country": "USA",
-        "start_date": "2025-05-20",
-        "end_date": "2025-05-21"
+        "start_date": "2025-09-17",
+        "end_date": "2025-09-23",
+        "format": "geojson",
     }
 
     print(f"Testing with parameters: {params}")
@@ -25,40 +26,17 @@ def debug_response():
             try:
                 data = response.json()
                 print("\nResponse is valid JSON")
-                print("Response Data Length:", len(data))
-
-                # Check whether the data structure matches the frontend FirePoint interface
-                if len(data) > 0:
-                    first_item = data[0]
-                    print("\nFirst item keys:", list(first_item.keys()))
-
-                    required_keys = [
-                        "latitude", "longitude", "bright_ti4", "bright_ti5",
-                        "frp", "confidence", "acq_date", "acq_time",
-                        "satellite", "country_id", "daynight", "instrument",
-                        "scan", "track", "version"
-                    ]
-
-                    missing_keys = [key for key in required_keys if key not in first_item]
-                    if missing_keys:
-                        print("\nWARNING: Missing required keys:", missing_keys)
-                    else:
-                        print("\nAll required keys present")
-
-                    # Check the acq_date format
-                    if "acq_date" in first_item:
-                        print("\nacq_date format:", first_item["acq_date"])
-                        try:
-                            datetime.strptime(first_item["acq_date"], "%Y-%m-%d")
-                            print("acq_date format is valid")
-                        except ValueError:
-                            print("WARNING: acq_date format is invalid!")
-
-                    # Output the complete first record
-                    print("\nFirst record details:")
-                    pprint(first_item)
+                # Expect GeoJSON FeatureCollection
+                print("Type:", data.get("type"))
+                features = data.get("features") or []
+                print("Features:", len(features))
+                if features:
+                    first = features[0]
+                    print("\nFirst feature keys:", list(first.keys()))
+                    props = first.get("properties", {})
+                    print("Sample properties keys:", list(props.keys())[:12])
                 else:
-                    print("\nNo data returned")
+                    print("No features in range.")
             except json.JSONDecodeError:
                 print("\nWARNING: Response is not valid JSON!")
                 print("Raw response (first 1000 chars):")

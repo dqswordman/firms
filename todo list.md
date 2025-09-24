@@ -28,6 +28,7 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
 - .env templates and configuration docs for all environments
 - Data availability admin endpoints (TTL override, cache flush) + runbook
 - Country fallback fit messaging for zero-result ISO3 queries
+- USA split-bbox merge (CONUS/Alaska/Hawaii) for performance
 
 ## Could
 - Advanced measure: undo last point, multi-record save, export GeoJSON
@@ -43,3 +44,5 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
 - 2025-09-26: Stage 3 measurement + query panel + heatmap/point/cluster styling & legends shipped (unit coverage; e2e planned)
 - 2025-09-27: Stage 4 time slider + filter integration underway (unit coverage; Stage 4 ongoing)
 - 2025-09-27: CI now runs backend pytest; fixed StatsPanel fallback to avoid requiring QueryClientProvider.
+- 2025-09-28: Dashboard default view; Map as module; Filters normalized (confidence); Charts line+radar reflect filters; client-side Analytics; map feature badge; animations.
+

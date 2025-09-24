@@ -20,12 +20,17 @@ type ValidationResult = {
   params?: FiresQueryParams;
 };
 
+const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+const toLocalISO = (date: Date): string => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+const localOffsetHours = (): number => -new Date().getTimezoneOffset() / 60;
+const nowInTz = (offsetHours: number): Date => {
+  const utcMs = Date.now() + new Date().getTimezoneOffset() * 60000;
+  return new Date(utcMs + offsetHours * 3600000);
+};
 const toIsoDate = (value: string): string => {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toISOString().slice(0, 10);
+  if (Number.isNaN(date.getTime())) return value;
+  return toLocalISO(date);
 };
 
 const diffDays = (start: string, end: string): number => {
@@ -35,10 +40,10 @@ const diffDays = (start: string, end: string): number => {
   return Math.round(diff / (1000 * 60 * 60 * 24));
 };
 
-const clampRange = (date: Date, days: number): string => {
-  const clone = new Date(date);
-  clone.setDate(clone.getDate() + days);
-  return clone.toISOString().slice(0, 10);
+const addDaysLocal = (date: Date, days: number): string => {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() + days);
+  return toLocalISO(d);
 };
 
 const parseNumber = (value: string): number | null => {
@@ -63,6 +68,12 @@ const validate = (mode: Mode, draft: DraftState): ValidationResult => {
     const end = toIsoDate(endDate);
     if (new Date(start) > new Date(end)) {
       errors.push('End date cannot be earlier than start date');
+    }
+    const today = new Date();
+    const todayLocal = new Date(today.getTime() - today.getTimezoneOffset() * 60000);
+    const todayIso = todayLocal.toISOString().slice(0, 10);
+    if (new Date(end) > new Date(todayIso)) {
+      errors.push('End date cannot exceed today');
     }
     if (diffDays(start, end) > 10) {
       errors.push('Date range cannot exceed 10 days');
@@ -141,15 +152,60 @@ export const QueryPanel: React.FC = () => {
   );
   const [errors, setErrors] = useState<string[]>([]);
 
-  const today = useMemo(() => new Date(), []);
-  const defaultEnd = today.toISOString().slice(0, 10);
-  const defaultStart = clampRange(today, -2);
+  // Approximate timezone by country ISO3 or bbox center longitude
+  const tzByCountry: Record<string, number> = {
+    USA: -5, CHN: 8, THA: 7, IND: 5.5, JPN: 9, KOR: 9, AUS: 10, RUS: 3,
+    BRA: -3, MEX: -6, CAN: -5, GBR: 0, FRA: 1, DEU: 1, ESP: 1, ITA: 1,
+  };
 
-  const effectiveDraft = useMemo(() => ({
-    ...draft,
-    startDate: draft.startDate || defaultStart,
-    endDate: draft.endDate || defaultEnd,
-  }), [draft, defaultStart, defaultEnd]);
+  const inferredTzOffset = useMemo(() => {
+    if (mode === 'country') {
+      const iso3 = (draft.country || '').trim().toUpperCase();
+      return tzByCountry[iso3] ?? localOffsetHours();
+    }
+    const west = parseNumber(draft.west);
+    const east = parseNumber(draft.east);
+    if (west != null && east != null) {
+      const centerLng = (west + east) / 2;
+      const approx = Math.max(-12, Math.min(14, Math.round(centerLng / 15)));
+      return approx;
+    }
+    return localOffsetHours();
+  }, [mode, draft.country, draft.west, draft.east]);
+
+  const todayRef = useMemo(() => nowInTz(inferredTzOffset), [inferredTzOffset]);
+  const defaultEnd = toLocalISO(todayRef);
+  const defaultStart = addDaysLocal(todayRef, -2);
+
+  const [preset, setPreset] = useState<'24h' | '48h' | '7d' | 'custom'>('7d');
+
+  const presetStart = useMemo(() => {
+    switch (preset) {
+      case '24h':
+        return addDaysLocal(todayRef, -1);
+      case '48h':
+        return addDaysLocal(todayRef, -2);
+      case '7d':
+        return addDaysLocal(todayRef, -6);
+      default:
+        return draft.startDate || defaultStart;
+    }
+  }, [preset, todayRef, defaultStart, draft.startDate]);
+
+  const effectiveDraft = useMemo(() => {
+    if (preset === 'custom') {
+      return {
+        ...draft,
+        startDate: draft.startDate || defaultStart,
+        endDate: draft.endDate || defaultEnd,
+      };
+    }
+    return {
+      ...draft,
+      startDate: presetStart,
+      endDate: defaultEnd,
+    };
+  }, [draft, defaultStart, defaultEnd, preset, presetStart]);
 
   const handleModeChange = (nextMode: Mode) => {
     setMode(nextMode);
@@ -167,6 +223,10 @@ export const QueryPanel: React.FC = () => {
         country: '',
       }));
     }
+  };
+
+  const handlePresetChange = (value: '24h' | '48h' | '7d' | 'custom') => {
+    setPreset(value);
   };
 
   useEffect(() => {
@@ -203,6 +263,15 @@ export const QueryPanel: React.FC = () => {
         <p>Choose a country or bbox to request fresh FIRMS data.</p>
       </header>
       <form className="query-form" onSubmit={handleSubmit} data-testid="query-form">
+        <div className="query-field">
+          <label>Range</label>
+          <div className="query-presets">
+            <label><input type="radio" name="preset" checked={preset==='24h'} onChange={() => handlePresetChange('24h')} /> Last 24h</label>
+            <label><input type="radio" name="preset" checked={preset==='48h'} onChange={() => handlePresetChange('48h')} /> Last 48h</label>
+            <label><input type="radio" name="preset" checked={preset==='7d'} onChange={() => handlePresetChange('7d')} /> Last 7 days</label>
+            <label><input type="radio" name="preset" checked={preset==='custom'} onChange={() => handlePresetChange('custom')} /> Custom</label>
+          </div>
+        </div>
         <div className="query-field">
           <label htmlFor="mode">Mode</label>
           <select
@@ -244,11 +313,11 @@ export const QueryPanel: React.FC = () => {
         <div className="query-grid">
           <div className="query-field">
             <label htmlFor="startDate">Start date</label>
-            <input id="startDate" type="date" {...bind('startDate')} />
+            <input id="startDate" type="date" max={defaultEnd} disabled={preset!=='custom'} {...bind('startDate')} />
           </div>
           <div className="query-field">
             <label htmlFor="endDate">End date</label>
-            <input id="endDate" type="date" {...bind('endDate')} />
+            <input id="endDate" type="date" max={defaultEnd} disabled={preset!=='custom'} {...bind('endDate')} />
           </div>
         </div>
 

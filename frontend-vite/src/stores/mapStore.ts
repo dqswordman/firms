@@ -27,6 +27,8 @@ export interface FilterState {
   frpMin: number | null;
   frpMax: number | null;
   confidence: 'all' | 'low' | 'nominal' | 'high';
+  dateStart?: string | null;
+  dateEnd?: string | null;
 }
 
 interface MapStore {
@@ -58,6 +60,8 @@ interface MapStore {
   autoFitRequest: AutoFitRequest | null;
   requestAutoFit: (bounds: LatLngBoundsExpression, padding?: [number, number]) => void;
   clearAutoFit: () => void;
+  showMap: boolean;
+  setShowMap: (visible: boolean) => void;
 }
 
 const EARTH_RADIUS_METERS = 6_371_000;
@@ -117,13 +121,6 @@ const createDefaultMeasurement = (): MeasurementState => ({
   areaSquareMeters: 0,
 });
 
-const defaultQuery: FiresQueryParams = {
-  mode: 'country',
-  country: 'USA',
-  startDate: '2024-01-01',
-  endDate: '2024-01-03',
-  format: 'geojson',
-};
 
 export const useMapStore = create<MapStore>((set) => ({
   viewport: {
@@ -146,14 +143,16 @@ export const useMapStore = create<MapStore>((set) => ({
   showHeatmap: false,
   setShowHeatmap: (visible) => set({ showHeatmap: visible }),
   toggleHeatmap: () => set((state) => ({ showHeatmap: !state.showHeatmap })),
-  queryParams: defaultQuery,
+  queryParams: null,
   setQueryParams: (params) => set({ queryParams: params }),
-  lastSubmittedQuery: defaultQuery,
+  lastSubmittedQuery: null,
   submitQuery: (params) => set({ queryParams: params, lastSubmittedQuery: params }),
   filters: {
     frpMin: null,
     frpMax: null,
     confidence: 'all',
+    dateStart: null,
+    dateEnd: null,
   },
   setFilters: (update) =>
     set((state) => ({ filters: { ...state.filters, ...update } })),
@@ -230,4 +229,6 @@ export const useMapStore = create<MapStore>((set) => ({
       },
     }),
   clearAutoFit: () => set({ autoFitRequest: null }),
+  showMap: false,
+  setShowMap: (visible) => set({ showMap: visible }),
 }));

@@ -29,11 +29,19 @@ describe('StatsPanel', () => {
 
   it('renders fallback when no query', () => {
     useMapStore.setState({ lastSubmittedQuery: null });
+    vi.spyOn(statsQueryModule, 'useFiresQuery').mockReturnValue({ data: undefined } as any);
+    vi.spyOn(statsQueryModule, 'useFireStatsQuery').mockReturnValue({
+      data: undefined,
+      isFetching: false,
+      isError: false,
+      error: null,
+    } as ReturnType<typeof statsQueryModule.useFireStatsQuery>);
     render(<StatsPanel />);
     expect(screen.getByText(/Run a query/)).toBeInTheDocument();
   });
 
   it('renders loading state', () => {
+    vi.spyOn(statsQueryModule, 'useFiresQuery').mockReturnValue({ data: undefined } as any);
     vi.spyOn(statsQueryModule, 'useFireStatsQuery').mockReturnValue({
       data: undefined,
       isFetching: true,
@@ -45,6 +53,7 @@ describe('StatsPanel', () => {
   });
 
   it('renders entries', () => {
+    vi.spyOn(statsQueryModule, 'useFiresQuery').mockReturnValue({ data: undefined } as any);
     vi.spyOn(statsQueryModule, 'useFireStatsQuery').mockReturnValue({
       data: { total: 100, confidence: { high: 60 } },
       isFetching: false,

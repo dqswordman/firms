@@ -1,4 +1,4 @@
-﻿# Update Log
+# Update Log
 
 ## 2025-09-27
 
@@ -9,11 +9,20 @@
   - Added temporary legacy compatibility by mounting the fires router at root (`/fires`, `/fires/stats`) alongside `/api/*`.
   - Fixed `Settings` to resolve `backend/.env` via absolute path so `FIRMS_MAP_KEY` loads correctly regardless of working directory.
   - Full cutover to modular app: removed legacy `backend/main.py` and dropped compatibility routes; tests updated to target `app.main` and services only. Removed manual HTTP scripts.
+  - Added `/api/debug/availability` to quickly validate FIRMS MAP key and upstream reachability.
+  - Date validation now uses local date instead of UTC to avoid false 400s for users ahead of UTC (`app/services/fires.py`).
 - Docs
   - Marked Stage 1 as complete and clarified middleware in `README.md`. Updated backend/frontend setup to modular+Vite only.
   - Fixed typos/control characters in `todo list.md` and noted modular layout now includes CORS + GZip.
   - Updated README to note modular route tests inclusion.
   - Added Vite dev origins (5173) to example `ALLOWED_ORIGINS` and updated local `.env` to resolve CORS "Failed to fetch" during dev.
+  - Troubleshooting now documents 400 for future end dates and UI prevention.
+
+- Frontend
+  - Improved error interceptor to read FastAPI `{detail: {message}}` shape (`frontend-vite/src/services/http.ts`).
+  - QueryPanel adds max attribute for date inputs and validation to prevent future end dates (`frontend-vite/src/features/map/QueryPanel.tsx`).
+  - Added time range presets (24h/48h/7d/Custom) and switched initial state to no auto-fetch by default (`useMapStore` now starts with `lastSubmittedQuery: null`).
+  - Ensured non-blocking status toast (`.map-status`) doesn��t intercept clicks with `pointer-events: none`.
 
 Validation
 - Frontend legacy typecheck: `cd frontend && npx tsc -p tsconfig.json --noEmit` passed.
@@ -71,7 +80,7 @@ This document records notable changes applied to the project by the agent.
 - Backend
   - Enforced environment variable usage: removed fallback hard-coded MAP key; if `FIRMS_MAP_KEY` is missing, API returns 503. Kept legacy `FIRMS_API_KEY` with deprecation warning.
   - Fixed country validation: stop calling deprecated `/api/countries` (returns "Invalid API call"). Now only ISO3 format is validated and country queries use v4 `country` endpoint directly.
-  - Implemented ISO3闂佹剚鍋呮俊绯眔x mapping for common countries and route all country queries via `area` endpoint; unknown ISO3 returns 400 with guidance to use bbox.
+  - Implemented ISO3闁愁偅濡糱ox mapping for common countries and route all country queries via `area` endpoint; unknown ISO3 returns 400 with guidance to use bbox.
   - Hardened routes: removed debug endpoints and test utilities to reduce attack surface.
   - Improved `format` query validation to `pattern` (FastAPI/pydantic v2 compatibility).
   - GeoJSON transformation now preserves `acq_date`, `acq_time`, `bright_ti4`, `bright_ti5`, and normalized `brightness`/`confidence` for better frontend compatibility.
@@ -82,7 +91,7 @@ This document records notable changes applied to the project by the agent.
   - Unified query parameter to `sourcePriority` and updated query key for caching.
   - Heatmap and Cluster now tolerate missing/typed fields (brightness, FRP, confidence).
   - Trend chart fetches full-range JSON once for accurate daily series.
-  - Search form adds dataset selector (optional) and strict date validation (闂?0 days, end 闂?today).
+  - Search form adds dataset selector (optional) and strict date validation (�?0 days, end �?today).
   - One-shot loading: queries now fetch the entire date range once; the time slider filters client-side to avoid per-day refetches.
   - UI overhaul with MUI: new dark app bar, floating MUI cards for query/controls, bottom analytics panel with tabs (Statistics/Trend/Radar).
   - Heatmap styling improved (radius/blur/gradient); basemap selector added (OSM, CARTO Dark, Esri Satellite, Stamen Toner).
@@ -116,9 +125,9 @@ This document records notable changes applied to the project by the agent.
   - Map filtering: Added optional Filter (FRP/Brightness >= threshold) in Fires panel; applies to heatmap and clusters; disabling shows all points again.
   - Filter persistence: Filter settings persist via URL hash and localStorage as part of layer settings.
   - Analytics integration: Optional toggle to apply the same filter to Analytics (Statistics/Trend/Radar).
-  - Legend help: Added Help dialog (Legend/Filter/Timeline/Measure & Location) and a quick 闂?闂?entry in the Legend panel.
+  - Legend help: Added Help dialog (Legend/Filter/Timeline/Measure & Location) and a quick �?�?entry in the Legend panel.
   - Toolbar: Implemented Measure (basic distance), Location (drop marker and copy lat/lon), and Help actions.
-  - Fixed: Analytics 闈㈡澘灞曞紑鏃讹紝鍙充晶 Legend 浼氶伄鎸′笅鎷夎彍鍗曠殑闂锛堟彁楂?Select 鑿滃崟 z-index锛夈€?- Docs
+  - Fixed: Analytics 面板展开时，右侧 Legend 会遮挡下拉菜单的问题（提�?Select 菜单 z-index）�?- Docs
   - No setup changes. Next: reflect UI grouping in screenshots/guide.
 
 - Validation
@@ -132,12 +141,12 @@ This document records notable changes applied to the project by the agent.
   - LAYERS button now scrolls/focuses the right-side controls panel and briefly highlights it.
   - MUI Select menus use portal-to-body with zIndex 20000 to avoid overlap; applied on Heatmap weight and Filter selects.
   - Help dialog content updated (EN) and notes that Location has been removed.
-  - Measure: upgraded with Distance/Area modes, unit switching (km/mi/m; km闁?mi闁?ha), per-segment labels, ESC cancel, Clear/Pan in a floating "MEASURE TOOL" card.
+  - Measure: upgraded with Distance/Area modes, unit switching (km/mi/m; km�?mi�?ha), per-segment labels, ESC cancel, Clear/Pan in a floating "MEASURE TOOL" card.
   - Legend: temporarily removed the right-panel Legend section to prevent dropdown overlap with Analytics (Trend/Radar) and MUI Selects.
 
 - Docs
   - README UI overview: noted that the Location action has been removed.
-  - todo list: added a checked item to mark 闂佺偨鍎茬划搴濈昂闂?Location闂佹寧绋戦悧濠勨偓鍨矒閺岋箓顢欓懡銈囨喛婵炲濯寸徊鍧楁偉濠婂牊鏅繛鎴炵懄閻庮喗淇婂Δ瀣埌闁告埊绻濆瀵糕偓娑櫳戦悡鈧梺鎸庣☉椤︻偊鍩€?
+  - todo list: added a checked item to mark 闁炽儲绮庝簺�?Location闁挎稑鐗婄€垫粓鏌﹂鑽ょ憿濞寸媴绲块悥婊堟晬濞戞瑦鐎俊妤嬬到閸戯繝寮寸€涙ɑ鐓€闁挎稑顦埀?
   - TODOs updated: range-selection and tick-density items checked; LAYERS focus behavior marked complete.
 
 - Validation
@@ -158,7 +167,7 @@ This document records notable changes applied to the project by the agent.
 
 2025-09-05 - Measure stabilized; docs synced
 - Frontend
-  - Fixed render loop causing components to remount on mousemove (guarded settings propagation), eliminating 鈥淢aximum update depth exceeded鈥?
+  - Fixed render loop causing components to remount on mousemove (guarded settings propagation), eliminating “Maximum update depth exceeded�?
   - Finalized Measure UX: first click shows dashed preview + running total; subsequent clicks fix segments with per-segment labels; double-click ends session; CLEAR reliably removes all items.
   - Ensured all measure vectors use a dedicated pane + SVG renderer for stable z-order above heatmap/clusters.
 - Docs
@@ -194,3 +203,20 @@ This document records notable changes applied to the project by the agent.
   - Enabled backend pytest in CI (`.github/workflows/ci.yml`) to run unit tests after syntax check.
 - Docs
   - Clarified backend run commands for legacy vs modular app in `README.md`.
+
+## 2025-09-28
+
+- Frontend
+  - Default to Dashboard (Root) view; Map is a module you open when needed. Added subtle fade/slide animations for cards/map.
+  - Time window now acts purely as a client-side date filter (no refetch). Filters (FRP/Confidence/Date) drive Map, Analytics, and Charts consistently.
+  - Confidence filtering normalized: numeric (>=80 high, >=30 nominal, else low) and textual (h/n/l) supported; prevents accidental empty results.
+  - ChartsPanel switched Daily counts to a high-contrast line chart; Radar retained. Both reflect current Filters.
+  - Map badge shows "Loaded N features" when results are present; fire points show detail popups on click.
+  - StatsPanel computes client-side analytics from filtered features (FRP sum/max/avg, day/night, confidence buckets, satellite distribution) with backend stats as fallback.
+  - Files: Root.tsx, MapView.tsx, ChartsPanel.tsx, StatsPanel.tsx, FiresLayer.tsx, filterUtils.ts, index.css.
+
+- Backend
+  - Always use FIRMS v4 area endpoint (country is unavailable upstream). Debug routes remain available: `/api/debug/availability`, `/api/fires/debug/compose`.
+
+- Validation
+  - Frontend: 32 tests passing. Backend: tests passing.

@@ -116,7 +116,8 @@ class FireService:
 
         start = self._parse_date(start_date)
         end = self._parse_date(end_date)
-        now = datetime.utcnow().date()
+        # Use local date to align with frontend date pickers and avoid UTC/locale mismatches
+        now = datetime.now().date()
         if start > end:
             raise HTTPExceptionFactory.bad_request("Start date must not be later than end date")
         if end > now:
@@ -146,13 +147,14 @@ class FireService:
             response.headers["X-Data-Availability"] = "No data available for requested date range"
             return None
 
+        # Always use area URLs. The FIRMS country endpoint is currently marked
+        # "Feature not available" and can return Invalid API call.
         urls = compose_urls(
             map_key,
             selected_source,
             start,
             end,
-            country=country if requested_country_mode else None,
-            area=(west, south, east, north) if not requested_country_mode else None,
+            area=(west, south, east, north),
         )
         return FireQueryContext(urls=urls, selected_source=selected_source)
 

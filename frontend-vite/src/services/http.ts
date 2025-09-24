@@ -11,7 +11,13 @@ httpClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
-      const message = error.response.data?.message ?? error.message;
+      const data = error.response.data ?? {};
+      const message =
+        data.message ||
+        data.detail?.message ||
+        (typeof data.detail === 'string' ? data.detail : null) ||
+        error.message ||
+        'Request failed';
       return Promise.reject(new Error(message));
     }
     return Promise.reject(error);
