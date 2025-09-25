@@ -35,15 +35,37 @@ export const ChartsPanel: React.FC = () => {
   }, [filtered]);
 
   const radar = useMemo(() => {
-    const end = filters.dateEnd || lastQuery?.endDate;
-    if (!end) return { labels: [], values: [] };
-    const feats = (filtered?.features ?? []).filter((f) => getDate(f.properties) === end);
-    let viirs = 0, terra = 0, aqua = 0;
-    for (const f of feats) {
-      const sat = String(f.properties?.satellite || '').toUpperCase();
-      if (sat.startsWith('N')) viirs += 1; else if (sat === 'T') terra += 1; else aqua += 1;
-    }
-    return { labels: ['VIIRS', 'Terra', 'Aqua'], values: [viirs, terra, aqua] };
+    const featsAll = filtered?.features ?? [];
+    if (!featsAll.length) return { labels: [] as string[], values: [] as number[], title: '' };
+
+    // Prefer the latest available date within range; fallback to all data if that day has no points
+    const end = filters.dateEnd || lastQuery?.endDate || '';
+    const dates = Array.from(new Set(featsAll.map((f) => getDate(f.properties)).filter(Boolean))).sort();
+    const pickedDate = (dates.filter((d) => (end ? d <= end : true)).pop() || dates[dates.length - 1]) as string;
+    const byDay = featsAll.filter((f) => getDate(f.properties) === pickedDate);
+    const use = byDay.length ? byDay : featsAll;
+
+    // Derive FRP buckets + Day/Night distribution (percentages)
+    const frp = (p: any) => {
+      const v = typeof p?.frp === 'number' ? p.frp : Number(p?.frp ?? NaN);
+      return Number.isFinite(v) ? v : 0;
+    };
+    const total = use.length;
+    const frpHigh = use.filter((f) => frp(f.properties) >= 20).length;
+    const frpMid = use.filter((f) => {
+      const v = frp(f.properties);
+      return v >= 5 && v < 20;
+    }).length;
+    const frpLow = use.filter((f) => frp(f.properties) < 5).length;
+    const day = use.filter((f) => String(f.properties?.daynight || '').toUpperCase() === 'D').length;
+    const night = use.filter((f) => String(f.properties?.daynight || '').toUpperCase() === 'N').length;
+
+    const pct = (n: number) => (total ? (n * 100) / total : 0);
+    return {
+      labels: ['High FRP', 'Medium FRP', 'Low FRP', 'Day', 'Night'],
+      values: [pct(frpHigh), pct(frpMid), pct(frpLow), pct(day), pct(night)],
+      title: byDay.length ? `Distribution (${pickedDate})` : 'Distribution (range)'
+    };
   }, [filtered, filters.dateEnd, lastQuery?.endDate]);
 
   return (
@@ -91,8 +113,8 @@ export const ChartsPanel: React.FC = () => {
       {enable && showRadar && radar.labels.length ? (
         <div style={{ marginTop: '0.75rem' }}>
           <Radar
-            data={{ labels: radar.labels, datasets: [{ label: 'Today', data: radar.values, backgroundColor: 'rgba(139, 92, 246, 0.35)', borderColor: '#8b5cf6', pointBackgroundColor: '#8b5cf6' }] }}
-            options={{ responsive: true, plugins: { legend: { labels: { color: '#e2e8f0' } } }, scales: { r: { angleLines: { color: 'rgba(226,232,240,0.2)' }, grid: { color: 'rgba(226,232,240,0.2)' }, pointLabels: { color: '#e2e8f0' }, ticks: { display: false } } } }}
+            data={{ labels: radar.labels, datasets: [{ label: radar.title || 'Distribution', data: radar.values, backgroundColor: 'rgba(139, 92, 246, 0.35)', borderColor: '#8b5cf6', pointBackgroundColor: '#8b5cf6' }] }}
+            options={{ responsive: true, plugins: { legend: { labels: { color: '#e2e8f0' } }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${Number(ctx.raw as number).toFixed(1)}%` } } }, scales: { r: { angleLines: { color: 'rgba(226,232,240,0.2)' }, grid: { color: 'rgba(226,232,240,0.2)' }, pointLabels: { color: '#e2e8f0' }, ticks: { display: true, callback: (v) => `${v}%`, stepSize: 20 } } } }}
             redraw
           />
         </div>

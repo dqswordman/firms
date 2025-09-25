@@ -124,9 +124,9 @@ export const MapView: React.FC = () => {
         <TileLayer attribution="&copy; OpenStreetMap contributors" url={tileUrl} />
         <ViewportSync />
         <MapControllers />
+        {showHeatmap ? <FiresHeatmapLayer collection={filteredData ?? data} /> : null}
         {showPoints ? <FiresPointsLayer collection={filteredData ?? data} /> : null}
         {showClusters ? <FiresClusterLayer collection={filteredData ?? data} /> : null}
-        {showHeatmap ? <FiresHeatmapLayer collection={filteredData ?? data} /> : null}
         <MeasurementOverlay />
       </MapContainer>
       {enableQueries && ((filteredData ?? data)?.features?.length ?? 0) > 0 ? (

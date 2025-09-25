@@ -13,6 +13,8 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
     - [x] Route tests for modular /api (`backend/tests/test_api_routes.py`)
     - [ ] Typed response models in `app/schemas` and response_model wiring
   - AC: Frontend query service (Axios + TanStack Query) covering retries/toasts
+  - [x] Fix: Radar chart must default to latest available date within range (timezone-safe) and recognise VIIRS/Terra/Aqua codes consistently.
+  - [x] Fix: Point detail popups must open reliably even with heatmap enabled (heatmap non-interactive and layered beneath point/cluster layers).
 - Stage 3: Map core reimplementation
   - [x] AC: Hooks useMapInteractions, useMeasureTool, useAutoFit; Zustand store for map state
   - [x] AC: Measurement tool detach from map locking; automated tests in place (unit ready, e2e planned for Stage 5)
@@ -45,4 +47,5 @@ This list tracks the full-system rebuild toward Stage 1-5 delivery.
 - 2025-09-27: Stage 4 time slider + filter integration underway (unit coverage; Stage 4 ongoing)
 - 2025-09-27: CI now runs backend pytest; fixed StatsPanel fallback to avoid requiring QueryClientProvider.
 - 2025-09-28: Dashboard default view; Map as module; Filters normalized (confidence); Charts line+radar reflect filters; client-side Analytics; map feature badge; animations.
+- 2025-09-29: Popups clickable over heatmap; radar shows FRP/day-night distribution with date fallback; legacy frontend removed; vite TS check passes.
 

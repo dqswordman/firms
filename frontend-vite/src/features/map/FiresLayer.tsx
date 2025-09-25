@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import L, { type LatLngExpression } from 'leaflet';
-import { CircleMarker, GeoJSON, LayerGroup, Marker, useMap } from 'react-leaflet';
+import { CircleMarker, GeoJSON, LayerGroup, Marker, Popup, useMap } from 'react-leaflet';
 import type { GeoJsonObject } from 'geojson';
 import type { FireFeatureCollection } from '../../types';
 import { buildClusterIndex, type ClusterProperties } from './clusterUtils';
@@ -41,6 +41,7 @@ const heatmapStyle = (frp: number | undefined) => {
     weight: 0,
     opacity: 0,
     fillOpacity: 0.7,
+    interactive: false as const,
   };
 };
 
@@ -182,13 +183,36 @@ export const FiresClusterLayer: React.FC<FiresLayerProps> = ({ collection }) => 
 
         const props = feature.properties as ClusterProperties;
         const pointKey = props.originalIndex ?? index;
+        const acqDt = (props as any).acq_datetime || ((props as any).acq_date ? `${(props as any).acq_date} ${(props as any).acq_time || ''}` : 'Unknown');
+        const conf = (props as any).confidence_text ?? (props as any).confidence ?? '-';
+        const sat = (props as any).satellite ?? '-';
+        const src = (props as any).source ?? '-';
+        const b = typeof (props as any).brightness === 'number' ? (props as any).brightness as number : undefined;
+        const b4 = (props as any).bright_ti4 != null ? Number((props as any).bright_ti4) : undefined;
+        const b5 = (props as any).bright_ti5 != null ? Number((props as any).bright_ti5) : undefined;
+        const frpRaw = (props as any).frp;
+        const frpVal = typeof frpRaw === 'number' ? frpRaw : (frpRaw ? Number(frpRaw) : NaN);
         return (
           <CircleMarker
             key={`cluster-point-${pointKey}`}
             center={position}
             pathOptions={pointStyle}
             radius={pointStyle.radius}
-          />
+          >
+            <Popup>
+              <div style={{ fontSize: 12, lineHeight: 1.25, maxWidth: 240 }}>
+                <div style={{ fontWeight: 700, marginBottom: 6, borderBottom: '1px solid #e5e7eb', paddingBottom: 4 }}>Fire Point</div>
+                <div><b>Acquired</b>: {String(acqDt)}</div>
+                {!Number.isNaN(frpVal) ? (<div><b>Radiative Power</b>: {Number(frpVal).toFixed(2)} MW</div>) : null}
+                {conf ? (<div><b>Confidence</b>: {String(conf)}</div>) : null}
+                {typeof b === 'number' && Number.isFinite(b) ? (<div><b>Brightness</b>: {b.toFixed(2)}K</div>) : null}
+                {b4 != null && Number.isFinite(b4) ? (<div><b>Brightness (TI4)</b>: {Number(b4).toFixed(2)}K</div>) : null}
+                {b5 != null && Number.isFinite(b5) ? (<div><b>Brightness (TI5)</b>: {Number(b5).toFixed(2)}K</div>) : null}
+                {sat ? (<div><b>Satellite</b>: {String(sat)}</div>) : null}
+                {src ? (<div><b>Source</b>: {String(src)}</div>) : null}
+              </div>
+            </Popup>
+          </CircleMarker>
         );
       })}
     </LayerGroup>

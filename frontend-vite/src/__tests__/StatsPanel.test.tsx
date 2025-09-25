@@ -35,7 +35,7 @@ describe('StatsPanel', () => {
       isFetching: false,
       isError: false,
       error: null,
-    } as ReturnType<typeof statsQueryModule.useFireStatsQuery>);
+    } as unknown as ReturnType<typeof statsQueryModule.useFireStatsQuery>);
     render(<StatsPanel />);
     expect(screen.getByText(/Run a query/)).toBeInTheDocument();
   });
@@ -47,7 +47,7 @@ describe('StatsPanel', () => {
       isFetching: true,
       isError: false,
       error: null,
-    } as ReturnType<typeof statsQueryModule.useFireStatsQuery>);
+    } as unknown as ReturnType<typeof statsQueryModule.useFireStatsQuery>);
     render(<StatsPanel />);
     expect(screen.getByText(/Loading analytics/)).toBeInTheDocument();
   });
@@ -59,7 +59,7 @@ describe('StatsPanel', () => {
       isFetching: false,
       isError: false,
       error: null,
-    } as ReturnType<typeof statsQueryModule.useFireStatsQuery>);
+    } as unknown as ReturnType<typeof statsQueryModule.useFireStatsQuery>);
     render(<StatsPanel />);
     expect(screen.getByText('total')).toBeInTheDocument();
     expect(screen.getByText('100')).toBeInTheDocument();
